@@ -39,6 +39,10 @@ pip install -r requirements.txt
 GPU consigliata per training LoRA, ma compatibile anche CPU
 Emulator C64 opzionale per validazione (ACME assembler + VICE)
 
+Per gli scraper (c64_asm_scraper.py e clone_c64_asm.py):
+pip install requests beautifulsoup4 lxml
+git installato nel sistema
+
 🐳 Docker
 
 La pipeline può essere eseguita completamente in container Docker.
@@ -57,6 +61,12 @@ docker build -t c64-llm .
 🚀 Quick Start
 
 ```bash
+# Clona repo GitHub con codice C64/6502
+python clone_c64_asm.py --output ./data/src
+
+# Scarica codice da siti web (opzionale)
+python c64_asm_scraper.py
+
 # Esegui l'intera pipeline (PDF + ASM)
 docker-compose up --build
 ```
@@ -71,8 +81,8 @@ Questo esegue automaticamente:
 
 ```
 data/
-├── input/              # PDF sorgente (.pdf)
-├── src/                # File assembly (.asm)
+├── input/              # PDF sorgente (.pdf) + file scaricati dagli scraper
+├── src/                # File assembly (.asm) + repo clondati
 │   ├── algorithms/
 │   ├── examples/
 │   ├── games/
@@ -122,6 +132,8 @@ python build_dataset.py all /data /data/output/dataset.jsonl
 | `build_dataset.py` | Genera dataset JSONL da PDF e/o ASM |
 | `train_lora.py` | Addestra modello LoRA (richiede GPU) |
 | `validate_emulator.py` | Valida codice su emulatore C64 |
+| `c64_asm_scraper.py` | Scarica codice ASM da siti web (6502.org, Codebase64, GitHub, ecc.) |
+| `clone_c64_asm.py` | Clona repo GitHub con codice C64/6502 |
 
 🐚 Comandi Docker Manuali
 
@@ -177,7 +189,10 @@ c64-pdf-dataset/
 │  ├─ text_cleaner.py      # Pulizia testo
 │  ├─ build_dataset.py     # Generazione dataset
 │  ├─ train_lora.py        # Training LoRA
-│  └─ validate_emulator.py # Validazione emulator
+│  ├─ validate_emulator.py # Validazione emulator
+│  ├─ c64_asm_scraper.py   # Scraper siti web
+│  └─ clone_c64_asm.py     # Clona repo GitHub
+├─ clone_c64_asm.sh        # Script shell originale (legacy)
 ├─ Dockerfile              # Container Docker
 ├─ docker-compose.yml      # Orchestrazione
 └─ requirements.txt        # Dipendenze
@@ -188,6 +203,22 @@ Dataset Management
 Mantieni sempre una copia raw del PDF per confronto.
 Genera versioni multiple di dataset per esperimenti differenti.
 Combina PDF e file ASM per un dataset più completo.
+
+Acquisizione Dati
+```bash
+# Clona repo GitHub con codice C64/6502
+python clone_c64_asm.py --output ./data/src
+
+# Scarica codice da siti web
+python c64_asm_scraper.py --sites codebase64 6502org
+
+# Scarica tutto
+python c64_asm_scraper.py
+```
+
+I file scaricati vengono organizzati automaticamente:
+- `data/src/[nome_sito]/` per file ASM
+- `data/input/[nome_sito]/` per PDF
 
 Training Tips
 Per più libri, concatena i dataset .jsonl o usa dataset.load_dataset di Hugging Face.
