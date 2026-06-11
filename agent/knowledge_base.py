@@ -1,4 +1,5 @@
 import os
+import re
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -48,11 +49,34 @@ class C64KnowledgeBase:
             print("Index not found. Building it...")
             self.build_index()
 
-    def query(self, text, k=3):
+    def extract_links(self, text):
+        """Estrae link in formato Obsidian [[Note Name]]."""
+        return re.findall(r'\[\[(.*?)\]\]', text)
+
+    def query(self, text, k=3, follow_links=True):
         if not self.vectorstore:
             self.load_index()
+
+        # Ricerca vettoriale iniziale
         docs = self.vectorstore.similarity_search(text, k=k)
-        return docs
+
+        if not follow_links:
+            return docs
+
+        # Navigazione del grafo (semplice): cerca i documenti linkati nei risultati
+        all_docs = list(docs)
+        linked_queries = []
+        for doc in docs:
+            links = self.extract_links(doc.page_content)
+            linked_queries.extend(links)
+
+        # Se abbiamo trovato dei link, facciamo una ricerca anche per quelli
+        # per arricchire il contesto
+        for link_query in list(set(linked_queries))[:2]: # Limitiamo a 2 link per non esplodere il contesto
+            link_docs = self.vectorstore.similarity_search(link_query, k=1)
+            all_docs.extend(link_docs)
+
+        return all_docs
 
 if __name__ == "__main__":
     kb = C64KnowledgeBase()
