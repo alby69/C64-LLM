@@ -4,7 +4,7 @@ from agent.validator import ValidatorAgent
 
 class OrchestratorAgent:
     def __init__(self, model, tokenizer):
-        self.researcher = ResearcherAgent(model, tokenizer)
+        self.researcher = ResearcherAgent()
         self.coder = CoderAgent(model, tokenizer)
         self.validator = ValidatorAgent()
 

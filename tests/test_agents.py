@@ -13,9 +13,8 @@ class TestMultiAgentSystem(unittest.TestCase):
         self.mock_model.device = "cpu"
 
     def test_researcher_init(self):
-        researcher = ResearcherAgent(self.mock_model, self.mock_tokenizer)
+        researcher = ResearcherAgent()
         self.assertIsNotNone(researcher.kb)
-        self.assertEqual(researcher.model, self.mock_model)
 
     def test_coder_init(self):
         coder = CoderAgent(self.mock_model, self.mock_tokenizer)
