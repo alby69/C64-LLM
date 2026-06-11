@@ -2,13 +2,11 @@ import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
-from agent.knowledge_base import C64KnowledgeBase
+from agent.orchestrator import OrchestratorAgent
 import gradio as gr
 
 class C64CodingAgent:
     def __init__(self, base_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct", lora_path=None):
-        self.kb = C64KnowledgeBase()
-
         # Load model in 4-bit for inference on 16GB RAM
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -29,36 +27,10 @@ class C64CodingAgent:
             print(f"Loading LoRA from: {lora_path}")
             self.model = PeftModel.from_pretrained(self.model, lora_path)
 
-        self.system_prompt = (
-            "Sei un assistente specializzato nella programmazione per Commodore 64 (Assembly 6502 e BASIC v2). "
-            "Usa le informazioni fornite dal knowledge base per rispondere in modo accurato. "
-            "Scrivi codice pulito, commentato e ottimizzato."
-        )
+        self.orchestrator = OrchestratorAgent(self.model, self.tokenizer)
 
     def generate_response(self, user_input, use_rag=True):
-        context = ""
-        if use_rag:
-            docs = self.kb.query(user_input)
-            context = "\nInformazioni dal Knowledge Base:\n" + "\n".join([d.page_content for d in docs])
-
-        full_prompt = f"<|im_start|>system\n{self.system_prompt}{context}<|im_end|>\n"
-        full_prompt += f"<|im_start|>user\n{user_input}<|im_end|>\n"
-        full_prompt += "<|im_start|>assistant\n"
-
-        inputs = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
-
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=1024,
-                temperature=0.7,
-                top_p=0.9,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-
-        response = self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-        return response
+        return self.orchestrator.process_request(user_input, use_rag=use_rag)
 
 def launch_ui(lora_path=None):
     agent = C64CodingAgent(lora_path=lora_path)
