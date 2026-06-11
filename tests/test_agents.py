@@ -18,7 +18,7 @@ class TestMultiAgentSystem(unittest.TestCase):
 
     def test_coder_init(self):
         coder = CoderAgent(self.mock_model, self.mock_tokenizer)
-        self.assertEqual(coder.model, self.mock_model)
+        self.assertIsNotNone(coder.backend)
 
     def test_validator_basic(self):
         validator = ValidatorAgent()

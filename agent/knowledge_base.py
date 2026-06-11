@@ -24,10 +24,23 @@ class C64KnowledgeBase:
         # Carica sia Markdown che i file di testo puliti dalla pipeline
         documents = []
 
-        # Markdown
-        if any(f.endswith(".md") for f in os.listdir(self.kb_path)):
-            loader_md = DirectoryLoader(self.kb_path, glob="**/*.md", loader_cls=TextLoader)
-            documents.extend(loader_md.load())
+        # Markdown con parsing frontmatter
+        for root, _, files in os.walk(self.kb_path):
+            for file in files:
+                if file.endswith(".md"):
+                    path = os.path.join(root, file)
+                    with open(path, 'r') as f:
+                        post = frontmatter.load(f)
+                        # Combiniamo metadati e contenuto per l'indicizzazione
+                        content = post.content
+                        if post.metadata:
+                            tags = post.metadata.get('tags', [])
+                            if isinstance(tags, list):
+                                content += "\nTags: " + ", ".join(tags)
+                            elif isinstance(tags, str):
+                                content += "\nTags: " + tags
+
+                        documents.append(Document(page_content=content, metadata={"source": path, **post.metadata}))
 
         # Cleaned text from pipeline
         clean_txt = "data/output/clean.txt"
