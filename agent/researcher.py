@@ -1,64 +1,45 @@
-import torch
 from agent.knowledge_base import C64KnowledgeBase
+from utils.prompt_manager import PromptManager
+from agent.model_backend import ModelBackend
 
 class ResearcherAgent:
     def __init__(self, model=None, tokenizer=None):
         self.kb = C64KnowledgeBase()
-        self.model = model
-        self.tokenizer = tokenizer
+        if not isinstance(model, ModelBackend) and model is not None:
+            self.backend = ModelBackend(model, tokenizer)
+        else:
+            self.backend = model
+        self.pm = PromptManager()
 
     def expand_query(self, query):
         """Espande la query dell'utente in termini tecnici C64 usando l'LLM."""
-        if not self.model or not self.tokenizer:
+        if not self.backend:
             return query
 
+        system_prompt = self.pm.get_prompt("researcher.expansion.system")
         prompt = (
-            f"<|im_start|>system\nSei un esperto tecnico del Commodore 64. "
-            f"Traduci la richiesta dell'utente in parole chiave tecniche, registri VIC-II o SID, "
-            f"e indirizzi di memoria rilevanti per migliorare la ricerca nel Knowledge Base.\n"
-            f"Esempio: 'cambio colore bordo' -> '$D020, VIC-II, border color, register'\n"
-            f"Rispondi SOLO con le parole chiave separate da virgola.<|im_end|>\n"
+            f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
             f"<|im_start|>user\n{query}<|im_end|>\n"
             f"<|im_start|>assistant\n"
         )
 
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=50,
-                temperature=0.1,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-
-        expanded = self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
+        expanded = self.backend.generate(prompt, max_new_tokens=50, temperature=0.1).strip()
         print(f"[Researcher] Query espansa: {expanded}")
         return expanded
 
     def detect_language(self, query):
         """Rileva se l'utente richiede BASIC o Assembly."""
-        if not self.model or not self.tokenizer:
+        if not self.backend:
             return "both"
 
+        system_prompt = self.pm.get_prompt("researcher.language_detection.system")
         prompt = (
-            f"<|im_start|>system\nClassifica se la richiesta dell'utente riguarda il linguaggio 'BASIC', 'Assembly' o 'entrambi'. "
-            f"Rispondi solo con una di queste tre parole.<|im_end|>\n"
+            f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
             f"<|im_start|>user\n{query}<|im_end|>\n"
             f"<|im_start|>assistant\n"
         )
 
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=10,
-                temperature=0.1,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-
-        lang = self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip().lower()
+        lang = self.backend.generate(prompt, max_new_tokens=10, temperature=0.1).strip().lower()
         return lang
 
     def research(self, query):

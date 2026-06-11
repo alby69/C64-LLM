@@ -1,4 +1,7 @@
 import os
+import re
+import frontmatter
+from langchain_core.documents import Document
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -23,10 +26,23 @@ class C64KnowledgeBase:
         # Carica sia Markdown che i file di testo puliti dalla pipeline
         documents = []
 
-        # Markdown
-        if any(f.endswith(".md") for f in os.listdir(self.kb_path)):
-            loader_md = DirectoryLoader(self.kb_path, glob="**/*.md", loader_cls=TextLoader)
-            documents.extend(loader_md.load())
+        # Markdown con parsing frontmatter
+        for root, _, files in os.walk(self.kb_path):
+            for file in files:
+                if file.endswith(".md"):
+                    path = os.path.join(root, file)
+                    with open(path, 'r') as f:
+                        post = frontmatter.load(f)
+                        # Combiniamo metadati e contenuto per l'indicizzazione
+                        content = post.content
+                        if post.metadata:
+                            tags = post.metadata.get('tags', [])
+                            if isinstance(tags, list):
+                                content += "\nTags: " + ", ".join(tags)
+                            elif isinstance(tags, str):
+                                content += "\nTags: " + tags
+
+                        documents.append(Document(page_content=content, metadata={"source": path, **post.metadata}))
 
         # Cleaned text from pipeline
         clean_txt = "data/output/clean.txt"
@@ -48,11 +64,40 @@ class C64KnowledgeBase:
             print("Index not found. Building it...")
             self.build_index()
 
-    def query(self, text, k=3):
+    def extract_links(self, text):
+        """Estrae link in formato Obsidian [[Note Name|Alias]]."""
+        raw_links = re.findall(r'\[\[(.*?)\]\]', text)
+        clean_links = []
+        for link in raw_links:
+            # Gestisce gli alias: [[Nome Nota|Alias]] -> "Nome Nota"
+            clean_link = link.split('|')[0]
+            clean_links.append(clean_link)
+        return clean_links
+
+    def query(self, text, k=3, follow_links=True):
         if not self.vectorstore:
             self.load_index()
+
+        # Ricerca vettoriale iniziale
         docs = self.vectorstore.similarity_search(text, k=k)
-        return docs
+
+        if not follow_links:
+            return docs
+
+        # Navigazione del grafo (semplice): cerca i documenti linkati nei risultati
+        all_docs = list(docs)
+        linked_queries = []
+        for doc in docs:
+            links = self.extract_links(doc.page_content)
+            linked_queries.extend(links)
+
+        # Se abbiamo trovato dei link, facciamo una ricerca anche per quelli
+        # per arricchire il contesto
+        for link_query in list(set(linked_queries))[:2]: # Limitiamo a 2 link per non esplodere il contesto
+            link_docs = self.vectorstore.similarity_search(link_query, k=1)
+            all_docs.extend(link_docs)
+
+        return all_docs
 
 if __name__ == "__main__":
     kb = C64KnowledgeBase()
