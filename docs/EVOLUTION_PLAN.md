@@ -1,51 +1,30 @@
-# Evolution Plan: C64 Knowledge Engine
+# Evolution Plan: C64 Knowledge Engine (Updated)
 
-Questo documento dettaglia la strategia per far evolvere il progetto C64-LLM verso un sistema più potente, ottimizzato per hardware limitato (16GB RAM, no GPU) e basato sulla conoscenza strutturata.
+Questo documento dettaglia la strategia per far evolvere il progetto C64-LLM verso un sistema più potente e ottimizzato.
 
-## 1. Migrazione del Modello: Qwen2.5-Coder-1.5B
+## Stato Attuale (Fase 1 e 2 Completate)
 
-Come suggerito dall'analisi, passeremo all'uso di **Qwen2.5-Coder-1.5B-Instruct**.
+- [x] **Migrazione Modello**: Supporto per Qwen2.5-Coder-1.5B via Transformers e GGUF.
+- [x] **Backend Unificato**: Implementato `ModelBackend` e `LlamaCppBackend` per esecuzione su CPU/GPU.
+- [x] **Prompt Management System (PMS)**: Centralizzato in `data/prompts/prompts.yaml`.
+- [x] **Validazione Avanzata**: Migliorato `ValidatorAgent` con controlli specifici per BASIC v2.
+- [x] **Memory Map Tracking**: L'Orchestratore ora traccia l'uso della memoria per prevenire collisioni.
+- [x] **Refactoring KISS/DRY**: Logica della UI separata dal coordinamento degli agenti.
 
-- **Perché**: È lo stato dell'arte per modelli sotto i 3B parametri nel coding. Supporta bene l'italiano e ha una comprensione del contesto tecnico superiore a Phi o versioni precedenti di Qwen.
-- **Formato**: GGUF (via `llama.cpp` o `bitsandbytes` se usato in Python) per minimizzare l'occupazione di RAM a ~1-2 GB.
+## Fase 3: Obsidian & Graph Integration (In Corso)
 
-## 2. Da RAG a "Knowledge Engine" (Integrazione Obsidian)
+- [x] **ObsidianParser**: Implementato parsing di Wiki-links `[[...]]` e frontmatter YAML in `knowledge_base.py`.
+- [x] **Graph Retrieval**: Il `ResearcherAgent` può esplorare link correlati per arricchire il contesto.
+- [ ] **Visualizzazione Grafo**: Mostrare nella UI di Gradio le relazioni tra i documenti trovati.
 
-Invece di un semplice database vettoriale "flat", implementeremo una struttura ispirata a Obsidian.
+## Fase 4: Ottimizzazione e Usabilità PC "Normali"
 
-### Perché Obsidian/Markdown invece di LoRA?
-- **Flessibilità**: Aggiungere un nuovo manuale (es. "GEOS Reference") è immediato come copiare un file .md.
-- **Tracciabilità**: L'LLM può citare esattamente la nota o il file da cui ha tratto l'informazione.
-- **Relazioni**: Sfruttando i link Wiki `[[NomeNota]]`, possiamo navigare la conoscenza per associazione logica, non solo per similarità vettoriale.
+- [x] **Supporto GGUF**: Integrazione `llama-cpp-python` pronta all'uso.
+- [ ] **Docker Optimization**: Riduzione dimensioni immagine per deployment rapido.
+- [ ] **Installer Script**: Script unico per configurare ACME, VICE e ambiente Python.
 
-### Architettura Proposta
-1.  **Vault Obsidian**: Una cartella `knowledge_base/` organizzata in sottocartelle (BASIC, SID, VIC-II, etc.).
-2.  **Hybrid Retrieval**:
-    - **Vettoriale**: Per trovare il punto di partenza (es. "come fare sprite multiplexing").
-    - **Grafo**: Una volta trovato un documento (es. "Sprites"), il sistema carica anche i documenti collegati via Wiki-links (es. "Raster Interrupt", "VIC-II Registers") per completare il contesto.
+## Prossimi Passi Suggeriti
 
-## 3. Personalità Specializzate
-
-Invece di un addestramento LoRA costoso e rigido, useremo **Dynamic System Prompts** (già parzialmente implementati):
-- **C64 BASIC Expert**: Focus su brevità e compatibilità BASIC v2.
-- **6510 Assembly Expert**: Focus su cicli macchina e sintassi ACME.
-
-## 4. Roadmap di Implementazione
-
-### Fase 1: Consolidamento (Attuale)
-- [x] Deep Dive degli agenti.
-- [x] Miglioramento Validatori (BASIC + ASM).
-- [x] Personalità differenziate nel Coder.
-
-### Fase 2: Obsidian Integration
-- [ ] Implementazione di un `ObsidianParser` che estrae link `[[...]]`.
-- [ ] Aggiornamento del `ResearcherAgent` per esplorare i link correlati durante la ricerca.
-- [ ] Supporto per tag e metadati YAML nelle note.
-
-### Fase 3: Ottimizzazione Locale
-- [ ] Integrazione di `llama.cpp` come backend opzionale per massima velocità su CPU.
-- [ ] UI Gradio migliorata per visualizzare il "percorso di ricerca" nel grafo di conoscenza.
-
-## Conclusione
-
-La strategia "Small Model + Huge Structured Context" è la via più efficiente per dominare un dominio tecnico ristretto e complesso come quello del Commodore 64 su hardware consumer.
+1. **Espansione Knowledge Base**: Aggiungere più note tecniche su SID e VIC-II.
+2. **BASIC 2.0 Linter**: Un controllo ancora più severo sulle restrizioni del BASIC v2 (es. memoria riservata).
+3. **Multi-step Reasoning**: Permettere all'Orchestratore di pianificare task complessi in più round.
