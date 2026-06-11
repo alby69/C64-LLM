@@ -15,9 +15,11 @@ Il `CoderAgent` è l'agente esecutivo specializzato nella sintesi di codice funz
         - **Implementazione**: Produce il codice effettivo.
     - Questo approccio riduce gli errori logici comuni nella programmazione assembly.
 
-3.  **Ottimizzazione dei Parametri**:
-    - Utilizza una temperatura estremamente bassa (0.2) per il codice Assembly 6502, dove la precisione sintattica è vitale.
-    - Utilizza una temperatura leggermente più alta (0.4) per il BASIC v2 o per spiegazioni testuali, dove una maggiore fluidità linguistica è utile.
+3.  **Gestione delle Personalità (C64 Expert Profiles)**:
+    - In base al contesto rilevato, il Coder assume una 'Personalità' specifica tramite il **PMS**:
+        - **BASIC V2 Expert**: Bassa memoria, variabili corte, sintassi standard.
+        - **6510 Assembly Expert**: Ottimizzazione cicli macchina, sintassi ACME.
+    - La temperatura viene adattata dinamicamente (0.2 per ASM, 0.4 per BASIC).
 
 ## Punti di Forza
 - **Affidabilità Sintattica**: Grazie alla bassa temperatura e alla validazione a valle dell'Orchestratore.
@@ -26,13 +28,13 @@ Il `CoderAgent` è l'agente esecutivo specializzato nella sintesi di codice funz
 ## Come Possiamo Migliorarlo (Evoluzioni Future)
 
 1.  **Ottimizzatore di Cicli (Cycle Counter)**:
-    - Un modulo che analizza il codice generato e suggerisce alternative più veloci (es. usare `LSR` invece di `DIV` o tabelle di look-up per calcoli complessi).
+    - Un modulo che analizza il codice generato e suggerisce alternative più veloci (es. usare `LSR` invece di `DIV` o tabelle di look-up).
 
-2.  **Linter Assembly Integrato**:
-    - Prima di passare il codice al Validator, il Coder potrebbe far passare il sorgente attraverso un linter simbolico per verificare che tutte le etichette siano definite.
+2.  **Linter Simbolico**:
+    - Verificare che tutte le etichette siano definite e che non ci siano sovrapposizioni tra segmenti di memoria.
 
-3.  **Esempi "Few-Shot" Dinamici**:
-    - Il Researcher potrebbe recuperare non solo documentazione, ma anche piccoli snippet di codice "perfetti" come esempi per il Coder, migliorando la coerenza dello stile.
+3.  **Few-Shot Dinamici dal Knowledge Engine**:
+    - Recuperare piccoli snippet di codice "perfetti" basati sulla query per migliorare lo stile e la correttezza del codice generato.
 
-4.  **Gestione della Memoria (Memory Mapping)**:
-    - Un sistema per tenere traccia delle aree di memoria occupate dal codice generato durante la sessione, per evitare che snippet successivi sovrascrivano quelli precedenti (fondamentale per programmi multi-modulo).
+4.  **Global Memory Mapping**:
+    - Un sistema per riservare aree di memoria tra diverse turnazioni di chat, evitando conflitti di indirizzi.

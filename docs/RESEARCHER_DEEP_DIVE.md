@@ -5,16 +5,18 @@ Il `ResearcherAgent` è il componente critico che garantisce che il `CoderAgent`
 ## Come Lavora (Flusso Attuale)
 
 1.  **Analisi & Espansione (Query Expansion)**:
-    - L'input dell'utente (es: "come cambio il colore del bordo?") è spesso troppo generico per una ricerca vettoriale efficace su manuali tecnici.
-    - Il Researcher usa l'LLM con un prompt a "bassa temperatura" (0.1) per tradurre la richiesta in termini tecnici C64.
-    - *Esempio*: "cambio colore bordo" -> "$D020, VIC-II, border color, register".
+    - Traduce la richiesta dell'utente in termini tecnici C64 (es: "cambio colore bordo" -> "$D020, VIC-II, border color, register") usando l'LLM e i prompt centralizzati nel PMS.
 
-2.  **Ricerca Vettoriale (FAISS)**:
-    - Utilizza gli embedding di `sentence-transformers` per cercare nei documenti indicizzati (Markdown e output della pipeline).
-    - Recupera i Top-K frammenti più simili alla query espansa.
+2.  **Rilevamento del Linguaggio (ASM vs BASIC)**:
+    - Pre-classifica la richiesta per filtrare i documenti e orientare la "personalità" del Coder. Se l'utente chiede BASIC, il Researcher dà priorità alla documentazione relativa.
 
-3.  **Sintesi del Context Brief**:
-    - Combina i frammenti trovati, includendo i metadati (come il file sorgente), in un blocco di testo strutturato che viene iniettato nel prompt del Coder.
+3.  **Ricerca Ibrida & Navigazione del Grafo (Obsidian Engine)**:
+    - **Ricerca Vettoriale**: Utilizza FAISS per trovare i frammenti più simili alla query.
+    - **Navigazione Wiki-links**: Se un frammento trovato contiene link come `[[Raster Interrupt]]`, il Researcher esplora automaticamente questi nodi correlati per arricchire il contesto.
+    - **Frontmatter & Tag**: Sfrutta i metadati YAML delle note Markdown per affinare la pertinenza.
+
+4.  **Sintesi del Context Brief**:
+    - Combina i frammenti trovati in un blocco strutturato, citando le sorgenti consultate.
 
 ## Punti di Forza dell'Implementazione "Opzione A"
 - **Zero Overhead di Memoria**: Condividendo l'istanza del modello con il Coder, il Researcher non occupa RAM aggiuntiva.
@@ -23,13 +25,13 @@ Il `ResearcherAgent` è il componente critico che garantisce che il `CoderAgent`
 ## Come Possiamo Migliorarlo (Evoluzioni Future)
 
 1.  **Reranking (Cross-Encoding)**:
-    - Dopo aver recuperato i primi 10-20 frammenti con la ricerca vettoriale (veloce ma meno precisa), potremmo usare un modello di reranking più piccolo per selezionare i 3 migliori. Questo migliora la "Signal-to-Noise Ratio".
+    - Implementare un modulo di reranking per selezionare i frammenti con la massima pertinenza semantica dopo la prima fase di ricerca vettoriale.
 
-2.  **Rilevamento del Linguaggio (ASM vs BASIC)**:
-    - Il Researcher potrebbe pre-classificare la richiesta. Se l'utente chiede BASIC, il Researcher può filtrare i documenti escludendo quelli puramente Assembly, evitando di confondere il Coder.
+2.  **HyDE (Hypothetical Document Embeddings)**:
+    - Generare una "risposta ipotetica" e usare quella per la ricerca, migliorando il matching con i documenti tecnici.
 
-3.  **HyDE (Hypothetical Document Embeddings)**:
-    - Invece di espandere solo le parole chiave, il Researcher potrebbe generare una "risposta ipotetica" e usare quella per la ricerca. Spesso la risposta ipotetica è più vicina vettorialmente al documento reale rispetto alla domanda.
+3.  **Multi-turn Memory**:
+    - Integrare la cronologia della conversazione per mantenere il contesto nelle query successive (es: "e ora cambia anche il colore dello sfondo").
 
-4.  **Multi-turn Memory**:
-    - Integrare la cronologia della conversazione nella fase di ricerca per mantenere il contesto di ciò di cui si è parlato precedentemente (es: "e ora cambia anche il colore dello sfondo").
+4.  **Integrazione Web (Optional)**:
+    - Un modulo per cercare su siti storici del C64 (es: Lemon64, CSDb) se il Knowledge Base locale non contiene l'informazione.

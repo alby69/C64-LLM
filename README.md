@@ -6,12 +6,12 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 
 - **Architettura Multi-Agente**:
     - **ResearcherAgent**: Espande le query dell'utente e recupera informazioni tecniche dal Knowledge Base.
-    - **CoderAgent**: Genera codice seguendo un ragionamento strutturato (Chain-of-Thought).
-    - **ValidatorAgent**: Verifica la correttezza del codice generato tramite l'assembler ACME.
-    - **OrchestratorAgent**: Coordina il flusso di lavoro e gestisce il self-healing in caso di errori.
-- **RAG (Retrieval-Augmented Generation)**: Integra documentazione tecnica, manuali e memory map del C64.
-- **Pipeline di Dati**: Strumenti per estrarre testo da PDF, pulire il codice e generare dataset per il fine-tuning.
-- **Ottimizzazione per RAM**: Configurato per girare con quantizzazione a 4-bit su macchine con 16GB di RAM.
+    - **CoderAgent**: Genera codice con 'personalità' specifiche (BASIC/Assembly) e ragionamento strutturato.
+    - **ValidatorAgent**: Verifica il codice tramite l'assembler ACME e un parser BASIC v2 dedicato.
+    - **OrchestratorAgent**: Coordina il flusso e gestisce il self-healing.
+- **C64 Knowledge Engine**: Un sistema RAG avanzato che integra un **Vault Obsidian**, supporta Wiki-links per la navigazione del grafo di conoscenza e parsing dei metadati (frontmatter).
+- **Prompt Management System (PMS)**: Centralizza tutti i prompt in file YAML gestiti via `PromptManager` per un disaccoppiamento totale tra logica e istruzioni.
+- **Ottimizzazione Locale (CPU Only)**: Supporto per modelli **GGUF** tramite `llama.cpp`, ideale per girare su macchine con 16GB RAM senza GPU.
 
 ## 📂 Struttura del Progetto
 
