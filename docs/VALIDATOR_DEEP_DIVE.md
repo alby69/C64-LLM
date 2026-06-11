@@ -16,11 +16,8 @@ Il `ValidatorAgent` è il "guardiano" della qualità del codice prodotto, incari
     - Per l'Assembly, si interfaccia con `utils/validate_emulator.py` che a sua volta richiama l'assemblatore **ACME**.
     - Cattura l'output dell'assemblatore per identificare errori di sintassi, etichette mancanti o istruzioni illegali.
 
-4.  **Validazione BASIC v2**:
-    - Implementa un parser sintattico interno che verifica:
-        - Presenza e formato dei numeri di riga.
-        - Bilanciamento dei cicli `FOR/NEXT`.
-        - Presenza di parole chiave BASIC v2.
+4.  **Validazione BASIC (Limitata)**:
+    - Attualmente, il codice BASIC viene rilevato ma non validato attivamente (ritorna sempre `True`).
 
 ## Punti di Forza
 - **Feedback Loop**: Fornisce log di errore dettagliati che l'Orchestratore può usare per richiedere correzioni all'LLM.
@@ -28,12 +25,12 @@ Il `ValidatorAgent` è il "guardiano" della qualità del codice prodotto, incari
 
 ## Come Possiamo Migliorarlo (Evoluzioni Future)
 
-1.  **Interprete BASIC Integrato**:
-    - Collegare un interprete BASIC v2 minimale per verificare non solo la sintassi, ma anche la logica di base (evitare `SYNTAX ERROR` a runtime).
+1.  **Parser BASIC v2**:
+    - Implementare un validatore sintattico per il BASIC che controlli la numerazione delle righe, la chiusura dei cicli `FOR/NEXT` e la correttezza dei comandi.
 
-2.  **Analisi Statica Avanzata Assembly**:
-    - Controllare i "range" dei salti relativi (branch).
-    - Verificare l'uso di indirizzi di memoria riservati dal KERNAL che potrebbero causare crash.
+2.  **Analisi Statica Assembly**:
+    - Controllare i "range" dei salti relativi (branch) e segnalare se superano i 127 byte, un errore comune per gli LLM.
+    - Verificare l'uso di indirizzi di memoria "proibiti" o riservati dal KERNAL.
 
-3.  **Unit Testing del Codice Generato**:
-    - Eseguire lo snippet in un ambiente emulato e verificare lo stato dei registri o della memoria dopo l'esecuzione (es: "il colore del bordo è diventato rosso?").
+3.  **Validazione del Flusso Logico**:
+    - Oltre alla compilazione, potrebbe eseguire piccoli test funzionali (es. "il codice finisce con un RTS?") per garantire che lo snippet non lasci il C64 in uno stato instabile.

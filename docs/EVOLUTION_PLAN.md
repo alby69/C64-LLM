@@ -32,19 +32,19 @@ Invece di un addestramento LoRA costoso e rigido, useremo **Dynamic System Promp
 
 ## 4. Roadmap di Implementazione
 
-### Fase 1: Consolidamento (Completato)
+### Fase 1: Consolidamento (Attuale)
 - [x] Deep Dive degli agenti.
 - [x] Miglioramento Validatori (BASIC + ASM).
 - [x] Personalità differenziate nel Coder.
 
-### Fase 2: Obsidian Integration (Completato)
-- [x] Implementazione di un `ObsidianParser` che estrae link `[[...]]`.
-- [x] Aggiornamento del `ResearcherAgent` per esplorare i link correlati durante la ricerca.
-- [x] Supporto per tag e metadati YAML nelle note.
+### Fase 2: Obsidian Integration
+- [ ] Implementazione di un `ObsidianParser` che estrae link `[[...]]`.
+- [ ] Aggiornamento del `ResearcherAgent` per esplorare i link correlati durante la ricerca.
+- [ ] Supporto per tag e metadati YAML nelle note.
 
-### Fase 3: Ottimizzazione Locale (Completato)
-- [x] Integrazione di `llama.cpp` come backend opzionale per massima velocità su CPU.
-- [x] UI Gradio migliorata per visualizzare il "percorso di ricerca" nel grafo di conoscenza.
+### Fase 3: Ottimizzazione Locale
+- [ ] Integrazione di `llama.cpp` come backend opzionale per massima velocità su CPU.
+- [ ] UI Gradio migliorata per visualizzare il "percorso di ricerca" nel grafo di conoscenza.
 
 ## Conclusione
 

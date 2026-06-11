@@ -38,14 +38,49 @@ class C64CodingAgent:
 
             self.backend = ModelBackend(self.model, self.tokenizer)
 
-        self.orchestrator = OrchestratorAgent(self.backend, None)
+    pm = PromptManager()
+    # Carica la libreria di prompt comuni dal sistema di gestione prompt
+    # Se non presente, usa dei default di fallback
+    prompt_library = pm.get_prompt("ui.prompt_library")
+    if isinstance(prompt_library, str): # Fallback se non trovato o errore
+        prompt_library = [
+            "Crea uno sprite...",
+            "Imposta un interruzione IRQ...",
+            "Carica un file dal disco...",
+            "Cambia il colore dello schermo...",
+            "Esegui un ciclo in BASIC..."
+        ]
 
-    def generate_response(self, user_input, use_rag=True):
-        response, sources = self.orchestrator.process_request(user_input, use_rag=use_rag)
-        if sources:
-            source_list = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in set(sources)])
-            response += source_list
-        return response
+    with gr.Blocks(title="C64 Coding Agent PRO") as demo:
+        gr.Markdown("# C64 Coding Agent PRO")
+        gr.Markdown("Esperto in Assembly 6502 e BASIC v2 con Knowledge Base integrato.")
+
+        with gr.Row():
+            with gr.Column(scale=4):
+                chat_interface = gr.ChatInterface(
+                    chat,
+                    additional_inputs=[
+                        gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True)
+                    ]
+                )
+            with gr.Column(scale=1):
+                gr.Markdown("### Prompt Library")
+                lib_dropdown = gr.Dropdown(choices=prompt_library, label="Snippet Comuni")
+                lib_button = gr.Button("Usa Prompt")
+
+                # Semplice sistema di autocompletamento concettuale
+                gr.Markdown("### Technical Terms")
+                gr.Examples(
+                    examples=["$D020", "VIC-II", "SID", "KERNAL", "Raster Interrupt"],
+                    inputs=chat_interface.textbox
+                )
+
+        def fill_prompt(choice):
+            return choice
+
+        lib_button.click(fn=fill_prompt, inputs=lib_dropdown, outputs=chat_interface.textbox)
+
+    demo.launch()
 
 if __name__ == "__main__":
     import sys

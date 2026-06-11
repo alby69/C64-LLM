@@ -29,11 +29,11 @@ L' `OrchestratorAgent` è il "regista" del sistema. Gestisce il ciclo di vita di
 1.  **Ragionamento Multi-Passo (Multi-step Reasoning)**:
     - Se una richiesta è complessa (es: "scrivi un gioco completo"), l'Orchestratore potrebbe scomporla in sotto-task e gestire più cicli di generazione/validazione.
 
-2.  **Gestione dello Stato (Context Memory)**:
-    - Mantenere una sessione coerente che ricordi le aree di memoria già assegnate (Memory Mapping) per evitare conflitti tra diversi snippet.
+2.  **Gestione dello Stato (Memory Management)**:
+    - Mantenere una "mappa della memoria" globale per evitare che diversi agenti suggeriscano di usare le stesse aree di RAM per scopi diversi nella stessa sessione.
 
-3.  **Ottimizzazione Backend Dinamica**:
-    - Scegliere il backend più adatto (es: Transformers per precisione se disponibile GPU, LlamaCpp per velocità su CPU) in modo trasparente.
+3.  **Selezione Dinamica del Modello**:
+    - Potrebbe decidere di usare parametri diversi (es: temperatura più alta per spiegazioni creative, più bassa per routine critiche) a seconda della fase del processo.
 
-4.  **Agenti Specializzati Aggiuntivi**:
-    - Integrare agenti per task grafici (Sprite Editor) o sonori (SID Composer) per scomposizioni di task complessi.
+4.  **Integrazione Obsidian-Wiki**:
+    - Diventare il navigatore principale del grafo di conoscenza, chiedendo al Researcher di esplorare nodi correlati se la ricerca iniziale è povera.

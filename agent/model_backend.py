@@ -1,5 +1,4 @@
 import torch
-import os
 
 class ModelBackend:
     def __init__(self, model, tokenizer):
@@ -23,22 +22,12 @@ class ModelBackend:
         return self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
 
 class LlamaCppBackend:
-    """Backend che utilizza llama-cpp-python per caricare modelli GGUF su CPU."""
-    def __init__(self, model_path, n_ctx=4096):
-        from llama_cpp import Llama
-        self.llm = Llama(
-            model_path=model_path,
-            n_ctx=n_ctx,
-            n_threads=os.cpu_count(), # Ottimizza per CPU locali
-            verbose=False
-        )
+    """Placeholder per futura integrazione llama.cpp per GGUF su CPU."""
+    def __init__(self, model_path):
+        self.model_path = model_path
+        # Qui verrebbe inizializzato llama-cpp-python
+        pass
 
-    def generate(self, prompt, max_new_tokens=512, temperature=0.3, top_p=0.9):
-        output = self.llm(
-            prompt,
-            max_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            stop=["<|im_end|>", "<|endoftext|>"]
-        )
-        return output["choices"][0]["text"]
+    def generate(self, prompt, **kwargs):
+        # Implementazione reale con llama-cpp-python
+        return "Not implemented yet (requires llama-cpp-python)"
