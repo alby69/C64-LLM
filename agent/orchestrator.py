@@ -1,12 +1,14 @@
 from agent.researcher import ResearcherAgent
 from agent.coder import CoderAgent
 from agent.validator import ValidatorAgent
+from utils.prompt_manager import PromptManager
 
 class OrchestratorAgent:
     def __init__(self, model, tokenizer):
         self.researcher = ResearcherAgent(model, tokenizer)
         self.coder = CoderAgent(model, tokenizer)
         self.validator = ValidatorAgent()
+        self.pm = PromptManager()
 
     def process_request(self, user_query, use_rag=True):
         """Coordina il flusso di lavoro tra i vari agenti."""
@@ -30,7 +32,7 @@ class OrchestratorAgent:
         else:
             # 4. Fase di Self-healing (opzionale - un tentativo di correzione)
             print(f"[Orchestrator] Validazione fallita. Tentativo di correzione...\nLog: {log}")
-            correction_query = f"Il codice precedentemente generato ha prodotto i seguenti errori di compilazione:\n{log}\nPer favore, correggi il codice."
+            correction_query = self.pm.get_prompt("orchestrator.self_healing.user_template", log=log)
 
             # Forniamo anche la risposta originale come contesto per la correzione
             full_context = f"{context}\n\nRisposta precedente errata:\n{initial_response}"
