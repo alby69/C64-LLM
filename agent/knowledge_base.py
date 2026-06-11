@@ -1,7 +1,5 @@
 import os
 import re
-import frontmatter
-from langchain_core.documents import Document
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -65,14 +63,8 @@ class C64KnowledgeBase:
             self.build_index()
 
     def extract_links(self, text):
-        """Estrae link in formato Obsidian [[Note Name|Alias]]."""
-        raw_links = re.findall(r'\[\[(.*?)\]\]', text)
-        clean_links = []
-        for link in raw_links:
-            # Gestisce gli alias: [[Nome Nota|Alias]] -> "Nome Nota"
-            clean_link = link.split('|')[0]
-            clean_links.append(clean_link)
-        return clean_links
+        """Estrae link in formato Obsidian [[Note Name]]."""
+        return re.findall(r'\[\[(.*?)\]\]', text)
 
     def query(self, text, k=3, follow_links=True):
         if not self.vectorstore:
