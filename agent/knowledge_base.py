@@ -20,8 +20,19 @@ class C64KnowledgeBase:
             with open(os.path.join(self.kb_path, "c64_memory_map.md"), "w") as f:
                 f.write("# C64 Memory Map\n\n$D020: Border Color\n$D021: Background Color\n$0400-$07E7: Screen Memory\n")
 
-        loader = DirectoryLoader(self.kb_path, glob="**/*.md", loader_cls=TextLoader)
-        documents = loader.load()
+        # Carica sia Markdown che i file di testo puliti dalla pipeline
+        documents = []
+
+        # Markdown
+        if any(f.endswith(".md") for f in os.listdir(self.kb_path)):
+            loader_md = DirectoryLoader(self.kb_path, glob="**/*.md", loader_cls=TextLoader)
+            documents.extend(loader_md.load())
+
+        # Cleaned text from pipeline
+        clean_txt = "data/output/clean.txt"
+        if os.path.exists(clean_txt):
+            loader_txt = TextLoader(clean_txt)
+            documents.extend(loader_txt.load())
 
         text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         docs = text_splitter.split_documents(documents)

@@ -6,6 +6,13 @@ import os
 import sys
 from pathlib import Path
 
+# Aggiunto per validazione
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from utils.validate_emulator import test_asm_code
+except ImportError:
+    test_asm_code = None
+
 # ==================== CONFIG ====================
 ASM_OPS = ["LDA", "STA", "JMP", "JSR", "LDX", "LDY", "ADC", "SBC", "RTS", "CLC", "SEC",
            "INC", "DEC", "AND", "ORA", "EOR", "CMP", "CPX", "CPY", "BEQ", "BNE", "BCC",
@@ -89,12 +96,25 @@ class DatasetGenerator:
 
         return {"asm": asm_blocks, "basic": basic_blocks}
 
-    def generate_examples(self, blocks, type="asm"):
+    def generate_examples(self, blocks, type="asm", validate=False):
         examples = []
         instructions = INSTRUCTION_POOL_ASM if type == "asm" else INSTRUCTION_POOL_BASIC
 
         for b in blocks:
             if not b.strip(): continue
+
+            # Optional validation for ASM
+            is_valid = True
+            if validate and type == "asm" and test_asm_code:
+                # Add a dummy origin if missing for validation
+                code_to_test = b.strip()
+                if "*=" not in code_to_test and ".org" not in code_to_test.lower():
+                    code_to_test = "*=$0801\n" + code_to_test
+
+                is_valid, _ = test_asm_code(code_to_test)
+
+            if not is_valid:
+                continue
 
             # Standard generation
             examples.append({
@@ -151,8 +171,10 @@ def main():
             all_asm_blocks.extend(blocks["asm"])
             all_basic_blocks.extend(blocks["basic"])
 
-    # Generate examples
-    dataset = gen.generate_examples(all_asm_blocks, type="asm")
+    # Generate examples (with optional validation for ASM)
+    validate_asm = os.getenv("VALIDATE_ASM", "false").lower() == "true"
+
+    dataset = gen.generate_examples(all_asm_blocks, type="asm", validate=validate_asm)
     dataset.extend(gen.generate_examples(all_basic_blocks, type="basic"))
 
     # Save
