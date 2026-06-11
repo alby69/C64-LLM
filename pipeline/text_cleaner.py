@@ -6,23 +6,39 @@ def advanced_clean(text):
     # Remove non-ascii but keep common symbols
     text = re.sub(r'[^\x00-\x7F]+', ' ', text)
 
+    # Remove standalone page numbers (e.g., "  123  " at start/end of lines)
+    text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+
+    # Remove typical PDF headers/footers (example: "Commodore 64 Programmer's Reference Guide")
+    # This is a placeholder for common strings found in manuals
+    headers = [
+        r"Commodore 64 Programmer's Reference Guide",
+        r"C64 User's Guide",
+        r"6502 Assembly Language Programming"
+    ]
+    for h in headers:
+        text = re.sub(h, '', text, flags=re.IGNORECASE)
+
     # Normalize spaces but keep indentation (essential for some ASM)
     text = re.sub(r'[ \t]+', ' ', text)
 
     # Fix common PDF extraction errors in C64 code
     # Example: "L DA" -> "LDA", "S TA" -> "STA"
     for op in ["LDA", "STA", "LDX", "STX", "LDY", "STY", "JSR", "JMP", "RTS"]:
-        pattern = r'\b' + ' '.join(list(op)) + r'\b'
+        pattern = r'\b' + r'\s*'.join(list(op)) + r'\b'
         text = re.sub(pattern, op, text, flags=re.IGNORECASE)
 
     # Normalize hex notation
     # $ C000 -> $C000
     text = re.sub(r'\$\s+([0-9A-F]{2,4})', r'$\1', text, flags=re.IGNORECASE)
 
+    # Fix broken labels (e.g., "LABEL :" -> "LABEL:")
+    text = re.sub(r'([A-Z0-9_]+)\s+:', r'\1:', text, flags=re.IGNORECASE)
+
     # Normalize double newlines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
 
-    return text
+    return text.strip()
 
 def main():
     if len(sys.argv) < 3:
