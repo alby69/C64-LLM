@@ -1,3 +1,4 @@
+import re
 from agent.researcher import ResearcherAgent
 from agent.coder import CoderAgent
 from agent.validator import ValidatorAgent
@@ -15,9 +16,12 @@ class OrchestratorAgent:
 
         # 1. Fase di Ricerca
         context = ""
+        sources = []
         if use_rag:
             print("[Orchestrator] Avvio fase di ricerca...")
             context = self.researcher.research(user_query)
+            # Estrarre le sorgenti per la UI (semplificato)
+            sources = re.findall(r"Sorgente: (.*?)\)", context)
 
         # 2. Fase di Codifica
         print("[Orchestrator] Avvio generazione risposta/codice...")
@@ -28,7 +32,7 @@ class OrchestratorAgent:
         success, log = self.validator.validate(initial_response)
 
         if success:
-            return initial_response
+            return initial_response, sources
         else:
             # 4. Fase di Self-healing (opzionale - un tentativo di correzione)
             print(f"[Orchestrator] Validazione fallita. Tentativo di correzione...\nLog: {log}")
@@ -43,6 +47,6 @@ class OrchestratorAgent:
             success_fixed, log_fixed = self.validator.validate(corrected_response)
 
             if success_fixed:
-                return f"Nota: Il primo tentativo conteneva errori, ecco la versione corretta:\n\n{corrected_response}"
+                return f"Nota: Il primo tentativo conteneva errori, ecco la versione corretta:\n\n{corrected_response}", sources
             else:
-                return f"Attenzione: Non è stato possibile generare codice valido dopo un tentativo di correzione.\n\nUltima versione generata:\n{corrected_response}\n\nErrori:\n{log_fixed}"
+                return f"Attenzione: Non è stato possibile generare codice valido dopo un tentativo di correzione.\n\nUltima versione generata:\n{corrected_response}\n\nErrori:\n{log_fixed}", sources
