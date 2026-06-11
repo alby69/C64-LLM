@@ -17,10 +17,18 @@ class CoderAgent:
         personality = ""
         if "basic" in user_query.lower() or "basic" in context.lower():
             temperature = 0.4
-            personality = "\nPERSONALITÀ: " + self.pm.get_prompt("coder.personalities.basic.system")
+            personality = (
+                "\nPERSONALITÀ: Sei un esperto di BASIC V2. "
+                "Preferisci la sintassi standard C64. Evita comandi di versioni successive (BASIC 3.5/7.0). "
+                "Usa soluzioni efficienti per la memoria (es. variabili corte, pochi spazi)."
+            )
         elif "assembly" in user_query.lower() or "asm" in user_query.lower() or "assembly" in context.lower():
             temperature = 0.2
-            personality = "\nPERSONALITÀ: " + self.pm.get_prompt("coder.personalities.assembly.system")
+            personality = (
+                "\nPERSONALITÀ: Sei un programmatore professionista di Assembly 6502/6510. "
+                "Il target è il MOS 6510 del C64. Usa la sintassi ACME Assembler. "
+                "Ottimizza per cicli di clock e occupa meno memoria possibile."
+            )
 
         full_prompt = f"<|im_start|>system\n{self.system_prompt}{personality}\n\nCONTESTO TECNICO:\n{context}<|im_end|>\n"
         full_prompt += f"<|im_start|>user\n{user_query}<|im_end|>\n"
