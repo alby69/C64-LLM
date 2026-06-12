@@ -1,6 +1,10 @@
 import os
 import logging
 from pathlib import Path
+
+# Configurazione logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("run_crawler")
 from agent.crawler import WebCrawlerAgent
 from pipeline.pdf2text import extract_text_pro
 
