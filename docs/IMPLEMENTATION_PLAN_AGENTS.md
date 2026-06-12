@@ -21,9 +21,9 @@ L'obiettivo è trasformare il Researcher in un motore di ricerca semantica di li
     2. Si usa il vettore di questa generazione per interrogare FAISS.
 - **Vantaggio**: Migliora il matching con documenti che usano terminologia tecnica specifica che l'utente potrebbe non conoscere.
 
-### 1.3 Multi-turn Memory
+### 1.3 Multi-turn Memory (Implementato)
 - **Azione**: Iniettare la `chat_history` nel processo di `expand_query`.
-- **Dettaglio**: Il prompt di espansione riceverà gli ultimi 2-3 scambi per risolvere anafore (es. "e ora fallo blu" -> "cambia il colore del bordo a blu").
+- **Dettaglio**: Il prompt di espansione riceve gli ultimi 2 scambi per risolvere anafore.
 
 ---
 
@@ -52,10 +52,10 @@ Il Coder deve passare da "generatore di codice" a "esperto di ottimizzazione".
 
 Il Validator deve diventare un vero e proprio compilatore/analizzatore statico.
 
-### 3.1 Parser BASIC v2 Avanzato
+### 3.1 Parser BASIC v2 Avanzato (In Corso)
 - **Azione**: Espandere `validate_basic` in `agent/validator.py`.
 - **Dettaglio**:
-    - **Controllo Limiti**: Verifica che i valori `POKE` siano tra 0-255 e gli indirizzi tra 0-65535.
+    - **Controllo Limiti (Implementato)**: Verifica che i valori `POKE` siano tra 0-255 e gli indirizzi tra 0-65535.
     - **Stack Overflow**: Analisi rudimentale di `GOSUB` annidati senza `RETURN`.
     - **Keyword Check**: Assicurarsi che non vengano usati comandi di versioni successive del BASIC.
 
@@ -63,9 +63,9 @@ Il Validator deve diventare un vero e proprio compilatore/analizzatore statico.
 - **Azione**: Analizzare i salti relativi (`BNE`, `BEQ`, ecc.).
 - **Dettaglio**: Calcolato preventivamente lo scostamento tra branch e label per evitare errori fuori range (+/- 127 byte).
 
-### 3.3 Logical Flow Validation
+### 3.3 Logical Flow Validation (Implementato)
 - **Azione**: Verifica della terminazione delle routine.
-- **Dettaglio**: Assicurarsi che i blocchi di codice finiscano con `RTS`, `RTI` o un loop infinito (`JMP *`), per evitare che la CPU "scivoli" in aree di memoria casuali.
+- **Dettaglio**: Verifica che i blocchi assembly finiscano con `RTS`, `RTI`, `JMP` o `BRK`.
 
 ---
 

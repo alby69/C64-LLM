@@ -41,6 +41,30 @@ class ValidatorAgent:
                         # In BASIC v2, SCORE1 e SCORE2 sono la stessa variabile (SC)
                         pass
 
+            # 3.1 Controllo Limiti POKE/PEEK
+            # POKE address, value
+            poke_matches = re.findall(r'POKE\s+(\d+|\$[0-9A-F]+)\s*,\s*(\d+|\$[0-9A-F]+)', content.upper())
+            for addr_str, val_str in poke_matches:
+                try:
+                    addr = int(addr_str) if addr_str.isdigit() else int(addr_str[1:], 16)
+                    val = int(val_str) if val_str.isdigit() else int(val_str[1:], 16)
+                    if not (0 <= addr <= 65535):
+                        errors.append(f"Linea {num}: Indirizzo POKE fuori range (0-65535): {addr}")
+                    if not (0 <= val <= 255):
+                        errors.append(f"Linea {num}: Valore POKE fuori range (0-255): {val}")
+                except ValueError:
+                    pass
+
+            # PEEK(address)
+            peek_matches = re.findall(r'PEEK\s*\(\s*(\d+|\$[0-9A-F]+)\s*\)', content.upper())
+            for addr_str in peek_matches:
+                try:
+                    addr = int(addr_str) if addr_str.isdigit() else int(addr_str[1:], 16)
+                    if not (0 <= addr <= 65535):
+                        errors.append(f"Linea {num}: Indirizzo PEEK fuori range (0-65535): {addr}")
+                except ValueError:
+                    pass
+
         # 3. Verifica bilanciamento FOR/NEXT
         for_count = len(re.findall(r'\bFOR\b', code.upper()))
         next_count = len(re.findall(r'\bNEXT\b', code.upper()))
@@ -113,6 +137,13 @@ class ValidatorAgent:
                 current_offset += size
 
         errors = []
+        last_inst = instructions[-1]['text'].upper() if instructions else ""
+
+        # 3.3 Logical Flow Validation: verifica terminazione
+        terminators = ["RTS", "RTI", "JMP", "BRK"]
+        if instructions and not any(t in last_inst for t in terminators):
+            errors.append(f"Avviso: Il codice assembly potrebbe non terminare correttamente (ultima istruzione: '{last_inst}').")
+
         for inst in instructions:
             text = inst['text'].upper()
             branches = ["BNE", "BEQ", "BPL", "BMI", "BCC", "BCS", "BVC", "BVS"]
@@ -126,7 +157,21 @@ class ValidatorAgent:
                             diff = labels[target_label] - (inst['offset'] + 2)
                             if diff < -128 or diff > 127:
                                 errors.append(f"Branch '{b}' verso '{target_label}' fuori range: {diff} byte.")
-                        # Se la label non è trovata, ACME darà errore comunque
+                        else:
+                            errors.append(f"Errore: Label '{target_label}' non definita per il branch '{b}'.")
+
+        # Controllo label anche per JMP e JSR
+        for inst in instructions:
+            text = inst['text'].upper()
+            if text.startswith("JMP") or text.startswith("JSR"):
+                target_match = re.search(r'\b([a-zA-Z0-9_]+)\b', inst['text'][3:].strip())
+                if target_match:
+                    target_label = target_match.group(1)
+                    # Escludi indirizzi esadecimali o decimali
+                    if not (target_label.startswith('$') or target_label.isdigit()):
+                        if target_label not in labels:
+                            errors.append(f"Errore: Label '{target_label}' non definita per '{text[:3]}'.")
+
         return errors
 
     def validate(self, response_text):
