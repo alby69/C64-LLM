@@ -11,14 +11,18 @@ class ResearcherAgent:
             self.backend = model
         self.pm = PromptManager()
 
-    def expand_query(self, query):
+    def expand_query(self, query, chat_history=None):
         """Espande la query dell'utente in termini tecnici C64 usando l'LLM."""
         if not self.backend:
             return query
 
+        history_str = ""
+        if chat_history:
+            history_str = "\nCRONOLOGIA RECENTE:\n" + "\n".join([f"U: {h[0]}\nA: {h[1]}" for h in chat_history[-2:]])
+
         system_prompt = self.pm.get_prompt("researcher.expansion.system")
         prompt = (
-            f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+            f"<|im_start|>system\n{system_prompt}{history_str}<|im_end|>\n"
             f"<|im_start|>user\n{query}<|im_end|>\n"
             f"<|im_start|>assistant\n"
         )
@@ -42,10 +46,10 @@ class ResearcherAgent:
         lang = self.backend.generate(prompt, max_new_tokens=10, temperature=0.1).strip().lower()
         return lang
 
-    def research(self, query):
+    def research(self, query, chat_history=None):
         """Interroga il Knowledge Base per ottenere contesto pertinente."""
-        # 1. Espansione della query
-        expanded_query = self.expand_query(query)
+        # 1. Espansione della query (con supporto multi-turn)
+        expanded_query = self.expand_query(query, chat_history=chat_history)
 
         # 2. Rilevamento linguaggio
         lang = self.detect_language(query)
