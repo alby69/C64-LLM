@@ -33,5 +33,5 @@ Il `ResearcherAgent` è il componente critico che garantisce che il `CoderAgent`
 3.  **Multi-turn Memory**:
     - Integrare la cronologia della conversazione per mantenere il contesto nelle query successive (es: "e ora cambia anche il colore dello sfondo").
 
-4.  **Integrazione Web (Optional)**:
-    - Un modulo per cercare su siti storici del C64 (es: Lemon64, CSDb) se il Knowledge Base locale non contiene l'informazione.
+4.  **Integrazione Web (Implementato)**:
+    - Tramite il `WebCrawlerAgent`, il sistema può ora acquisire proattivamente documentazione da Archive.org per colmare le lacune del Knowledge Base locale.
