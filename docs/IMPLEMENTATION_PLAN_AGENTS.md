@@ -21,9 +21,9 @@ L'obiettivo è trasformare il Researcher in un motore di ricerca semantica di li
     2. Si usa il vettore di questa generazione per interrogare FAISS.
 - **Vantaggio**: Migliora il matching con documenti che usano terminologia tecnica specifica che l'utente potrebbe non conoscere.
 
-### 1.3 Multi-turn Memory (Implementato)
+### 1.3 Multi-turn Memory
 - **Azione**: Iniettare la `chat_history` nel processo di `expand_query`.
-- **Dettaglio**: Il prompt di espansione riceve gli ultimi 2 scambi per risolvere anafore.
+- **Dettaglio**: Il prompt di espansione riceverà gli ultimi 2-3 scambi per risolvere anafore (es. "e ora fallo blu" -> "cambia il colore del bordo a blu").
 
 ---
 
