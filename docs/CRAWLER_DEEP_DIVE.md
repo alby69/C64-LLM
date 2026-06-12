@@ -5,9 +5,26 @@ Il `WebCrawlerAgent` è il componente proattivo del sistema, progettato per espa
 ## Missione
 A differenza del `ResearcherAgent` che è reattivo (cerca risposte a domande specifiche), il `WebCrawlerAgent` ha l'obiettivo di "mappare" la conoscenza storica e tecnica del Commodore 64, trasformando manuali, libri e articoli in note strutturate per Obsidian.
 
+## Gestione delle Fonti
+L'agente non "vaga" a caso nel web, ma monitora una lista di **Sorgenti Autorevoli** definita in `data/config/crawler_sources.yaml`.
+Le fonti supportate includono:
+- **C64-Wiki**: Documentazione enciclopedica.
+- **Codebase64**: Tutorial tecnici e demoscene.
+- **Zimmers.net**: Archivi di mappe e file storici.
+- **Archive.org**: Libri e manuali originali (PDF).
+- **GitHub**: Repository di riferimento (es. mist64/c64ref).
+
+## Interfaccia tra Agenti
+Il `WebCrawlerAgent` lavora "dietro le quinte" per alimentare il sistema:
+1. **Crawler**: Scopre nuovi PDF o articoli -> Li trasforma in Markdown Obsidian.
+2. **Knowledge Base**: Indicizza i nuovi file Markdown, i loro tag e i Wiki-links.
+3. **Researcher**: Quando l'utente fa una domanda, il Researcher trova i collegamenti nel grafo creato dal Crawler.
+4. **Coder**: Riceve il contesto arricchito (es. registri SID o mappe di memoria) per generare codice accurato.
+
 ## Flusso di Lavoro (Pipeline)
 
-1.  **Discovery (Archive.org API)**:
+1.  **Discovery (Source Monitoring)**:
+    - Legge `crawler_sources.yaml` e controlla `crawler_status.json` per identificare fonti nuove o aggiornate.
     - Utilizza la libreria `internetarchive` per cercare documenti tecnici basati su parole chiave (es. "6502 assembly", "Commodore 64 programmer's reference").
     - Filtra per `mediatype:texts` per garantire la presenza di documenti leggibili.
 

@@ -10,11 +10,20 @@ class MockBackend:
         # Ritorna un markdown fake per test
         return "---\ntitle: \"Mock Note\"\ntags: [mock]\n---\n# Mock\nContenuto trasformato."
 
-def run_crawler_pipeline(query, limit=1):
+from datetime import datetime
+
+def run_crawler_pipeline(query=None, limit=1):
     crawler = WebCrawlerAgent(model_backend=MockBackend())
 
-    # 1. Search
-    results = crawler.search_archive_org(query=query, limit=limit)
+    # 1. Monitoraggio Sorgenti
+    sources_to_check = crawler.check_updates()
+    logger.info(f"Found {len(sources_to_check)} sources to check from config.")
+
+    # 2. Esecuzione (per ora Archive.org come esempio)
+    # In futuro questa funzione chiamerà scraper diversi in base al 'type' della sorgente
+    results = []
+    if query:
+        results = crawler.search_archive_org(query=query, limit=limit)
 
     for item in results:
         # 2. Download
@@ -34,6 +43,14 @@ def run_crawler_pipeline(query, limit=1):
             # Decidiamo la categoria in base al titolo o lasciamo all'LLM (qui mock)
             category = "Research"
             crawler.save_note(obsidian_note, category, item['title'])
+
+            # Update status
+            status = crawler._load_status()
+            status[item.get('id', item['title'])] = {
+                "last_checked": datetime.now().isoformat(),
+                "source": item.get('url')
+            }
+            crawler._save_status(status)
 
             # Pulizia (opzionale, decommentare per liberare spazio)
             # import shutil

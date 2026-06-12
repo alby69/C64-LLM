@@ -2,6 +2,7 @@ import re
 import json
 import logging
 from pathlib import Path
+import yaml
 from internetarchive import search_items, get_item
 from utils.prompt_manager import PromptManager
 
@@ -9,11 +10,45 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WebCrawlerAgent")
 
 class WebCrawlerAgent:
-    def __init__(self, model_backend=None, kb_path="knowledge_base"):
+    def __init__(self, model_backend=None, kb_path="knowledge_base", config_path="data/config/crawler_sources.yaml"):
         self.backend = model_backend
         self.pm = PromptManager()
         self.kb_path = Path(kb_path)
         self.kb_path.mkdir(parents=True, exist_ok=True)
+        self.config_path = Path(config_path)
+        self.sources = self._load_sources()
+        self.status_file = Path("data/config/crawler_status.json")
+
+    def _load_sources(self):
+        """Carica la lista delle fonti dal file YAML."""
+        if self.config_path.exists():
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                return config.get('sources', [])
+        return []
+
+    def _load_status(self):
+        """Carica lo stato dell'ultimo crawling."""
+        if self.status_file.exists():
+            with open(self.status_file, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def _save_status(self, status):
+        """Salva lo stato del crawling."""
+        with open(self.status_file, 'w') as f:
+            json.dump(status, f, indent=2)
+
+    def check_updates(self):
+        """Controlla quali fonti necessitano di un aggiornamento."""
+        status = self._load_status()
+        to_update = []
+        for source in self.sources:
+            last_checked = status.get(source['name'], {}).get('last_checked')
+            # Per ora semplice: se non c'è nel log, va aggiornato
+            if not last_checked:
+                to_update.append(source)
+        return to_update
 
     def search_archive_org(self, query="commodore 64 programming", limit=5):
         """Cerca libri e documenti su Archive.org."""
