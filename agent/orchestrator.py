@@ -25,7 +25,21 @@ class OrchestratorAgent:
         self.pm = PromptManager()
         self.memory_tracker = MemoryMapTracker()
 
-    def process_request(self, user_query, use_rag=True):
+    def _suggest_memory_area(self, user_query, context):
+        """Suggerisce un'area di memoria libera basata sulla query."""
+        if "basic" in user_query.lower() or "basic" in context.lower():
+            return "Suggerimento: Per il BASIC v2, usa i numeri di riga standard (10, 20...). La memoria utente inizia a $0801."
+
+        # Per Assembly, cerchiamo di suggerire $C000 o $1000 se non usati
+        allocs = self.memory_tracker.get_summary()
+        if "C000" not in allocs:
+            return "Suggerimento: L'area $C000 (49152) è libera e spesso sicura per piccoli programmi Assembly."
+        if "1000" not in allocs:
+            return "Suggerimento: L'area $1000 (4096) è libera per il tuo codice Assembly."
+
+        return "Suggerimento: Assicurati di dichiarare esplicitamente l'indirizzo di inizio con * = $XXXX."
+
+    def process_request(self, user_query, use_rag=True, chat_history=None):
         """Coordina il flusso di lavoro tra i vari agenti."""
 
         # 1. Fase di Ricerca
@@ -33,12 +47,16 @@ class OrchestratorAgent:
         sources = []
         if use_rag:
             print("[Orchestrator] Avvio fase di ricerca...")
-            context = self.researcher.research(user_query)
+            # Passa la cronologia se disponibile (Evolution: Multi-turn)
+            context = self.researcher.research(user_query, chat_history=chat_history)
             # Estrarre le sorgenti per la UI (semplificato)
             sources = re.findall(r"Sorgente: (.*?)\)", context)
 
+        # Suggerimento proattivo della memoria
+        mem_suggestion = self._suggest_memory_area(user_query, context)
+
         # Aggiungi informazioni sulla memoria attuale al contesto
-        mem_context = f"\nMAPPA MEMORIA ATTUALE:\n{self.memory_tracker.get_summary()}\n"
+        mem_context = f"\nMAPPA MEMORIA ATTUALE:\n{self.memory_tracker.get_summary()}\n{mem_suggestion}\n"
         full_context_for_coder = context + mem_context
 
         # 2. Fase di Codifica

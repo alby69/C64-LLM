@@ -59,9 +59,9 @@ Il Validator deve diventare un vero e proprio compilatore/analizzatore statico.
     - **Stack Overflow**: Analisi rudimentale di `GOSUB` annidati senza `RETURN`.
     - **Keyword Check**: Assicurarsi che non vengano usati comandi di versioni successive del BASIC.
 
-### 3.2 Analisi Statica Assembly (Branch Check)
+### 3.2 Analisi Statica Assembly (Branch Check) (Implementato)
 - **Azione**: Analizzare i salti relativi (`BNE`, `BEQ`, ecc.).
-- **Dettaglio**: Calcolare la distanza tra il branch e la label. Se supera +/- 127 byte, segnalare errore prima ancora di chiamare ACME (risparmio di risorse).
+- **Dettaglio**: Calcolato preventivamente lo scostamento tra branch e label per evitare errori fuori range (+/- 127 byte).
 
 ### 3.3 Logical Flow Validation
 - **Azione**: Verifica della terminazione delle routine.
@@ -80,9 +80,9 @@ L'Orchestratore deve gestire task di alto livello scomponendoli.
     - L'Orchestratore scompone in: 1. Setup VIC-II, 2. Caricamento Sprite, 3. Setup IRQ musica.
     - Gestisce ogni task sequenzialmente, mantenendo lo stato globale.
 
-### 4.2 Proactive Memory Mapping
+### 4.2 Proactive Memory Mapping (Implementato)
 - **Azione**: L'Orchestratore suggerisce attivamente indirizzi liberi.
-- **Dettaglio**: Invece di limitarsi a tracciare la memoria, l'Orchestratore dice al Coder: "Usa l'area $C000-$CFFF perché è libera e sicura".
+- **Dettaglio**: L'Orchestratore suggerisce ora aree come $C000 o $1000 se non ancora allocate dal tracker.
 
 ### 4.3 Integrazione Obsidian-Wiki Estesa
 - **Azione**: Navigazione automatica del grafo basata sulla confidenza.
