@@ -84,6 +84,7 @@ L'Orchestratore deve gestire task di alto livello scomponendoli.
 - **Azione**: L'Orchestratore suggerisce attivamente indirizzi liberi.
 - **Dettaglio**: L'Orchestratore suggerisce ora aree come $C000 o $1000 se non ancora allocate dal tracker.
 
-### 4.3 Integrazione Obsidian-Wiki Estesa
+### 4.3 Integrazione Obsidian-Wiki Estesa (In Corso)
 - **Azione**: Navigazione automatica del grafo basata sulla confidenza.
 - **Dettaglio**: Se i risultati iniziali hanno un basso punteggio di similarità, l'Orchestratore ordina al Researcher di esplorare i nodi linkati a quelli trovati per trovare informazioni più pertinenti.
+- **Update**: Implementato `WebCrawlerAgent` per popolamento proattivo del grafo con metadati strutturati.
