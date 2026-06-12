@@ -6,9 +6,11 @@ def extract_text_pro(pdf_path):
     doc = fitz.open(pdf_path)
     full_text = ""
     for page in doc:
-        # Preserve layout to better identify code blocks
-        text = page.get_text("layout")
-        full_text += text + "\n\f" # use form feed to separate pages
+        # Use "blocks" to preserve some structure if "layout" is not supported or fails
+        text = page.get_text("blocks")
+        # Convert blocks to text lines
+        block_text = "\n".join([b[4] for b in text])
+        full_text += block_text + "\n\f" # use form feed to separate pages
     return full_text
 
 def main():
