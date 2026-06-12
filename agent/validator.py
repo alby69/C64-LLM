@@ -57,6 +57,78 @@ class ValidatorAgent:
         else:
             return False, "Errori BASIC:\n" + "\n".join(errors)
 
+    def _estimate_asm_size(self, line):
+        """Stima la dimensione in byte di una linea di codice assembly 6502."""
+        line = re.sub(r';.*', '', line).strip() # Rimuovi commenti
+        if not line or line.endswith(':'):
+            return 0
+
+        # Direttive assembler (approssimative)
+        if line.startswith('*') or line.lower().startswith('!'):
+            return 0
+
+        # Opcode senza operandi (es: INX, RTS)
+        if re.match(r'^[a-zA-Z]{3}$', line):
+            return 1
+
+        # Immediato (es: LDA #$00) -> 2 byte
+        if '#' in line:
+            return 2
+
+        # Assoluto (es: STA $D020) -> 3 byte (cerca $ seguito da 3 o 4 cifre hex)
+        if re.search(r'\$[0-9A-Fa-f]{3,4}', line):
+            return 3
+
+        # Zero Page o relativo (es: STA $02, BNE label) -> 2 byte
+        if re.search(r'\$[0-9A-Fa-f]{1,2}', line) or any(b in line.upper() for b in ["BNE", "BEQ", "BPL", "BMI", "BCC", "BCS", "BVC", "BVS"]):
+            return 2
+
+        # Default per istruzioni con etichette (es: JMP label -> 3, BNE label -> 2)
+        # Usiamo un'euristica: se è un branch è 2, altrimenti 3 (JMP/JSR)
+        if any(b in line.upper() for b in ["BNE", "BEQ", "BPL", "BMI", "BCC", "BCS", "BVC", "BVS"]):
+            return 2
+        return 3
+
+    def check_asm_branch_ranges(self, code):
+        """Verifica se i salti relativi (branch) sono potenzialmente fuori range (+/- 127 byte)."""
+        lines = code.split('\n')
+        labels = {}
+        instructions = []
+
+        current_offset = 0
+        for line in lines:
+            line = line.strip()
+            # Identifica label
+            label_match = re.match(r'^([a-zA-Z0-9_]+):', line)
+            if label_match:
+                labels[label_match.group(1)] = current_offset
+
+            size = self._estimate_asm_size(line)
+            if size > 0:
+                instructions.append({
+                    'offset': current_offset,
+                    'text': line,
+                    'size': size
+                })
+                current_offset += size
+
+        errors = []
+        for inst in instructions:
+            text = inst['text'].upper()
+            branches = ["BNE", "BEQ", "BPL", "BMI", "BCC", "BCS", "BVC", "BVS"]
+            for b in branches:
+                if text.startswith(b):
+                    # Estrai la label di destinazione
+                    target_match = re.search(r'\b([a-zA-Z0-9_]+)\b', inst['text'][3:].strip())
+                    if target_match:
+                        target_label = target_match.group(1)
+                        if target_label in labels:
+                            diff = labels[target_label] - (inst['offset'] + 2)
+                            if diff < -128 or diff > 127:
+                                errors.append(f"Branch '{b}' verso '{target_label}' fuori range: {diff} byte.")
+                        # Se la label non è trovata, ACME darà errore comunque
+        return errors
+
     def validate(self, response_text):
         """Estrae codice dalla risposta e lo valida."""
         code_blocks = re.findall(r'```(?:assembly|asm|6502|basic)?\n(.*?)\n```', response_text, re.DOTALL | re.IGNORECASE)
@@ -71,6 +143,12 @@ class ValidatorAgent:
         for code in code_blocks:
             # Semplice euristica per capire se è assembly o BASIC
             if any(instr in code.upper() for instr in ["LDA ", "STA ", "JSR ", "RTS", "INX", "CPX", "CMP ", "BNE ", "BEQ "]):
+                # Verifica statica preventiva dei branch
+                branch_errors = self.check_asm_branch_ranges(code)
+                if branch_errors:
+                    results.append((False, "Errori statici Assembly:\n" + "\n".join(branch_errors)))
+                    continue
+
                 success, log = test_asm_code(code)
                 results.append((success, log))
             elif any(instr in code.upper() for instr in ["PRINT", "GOTO", "POKE", "PEEK", "SYS", "REM"]) or re.match(r'^\d+\s', code.strip()):
