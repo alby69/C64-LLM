@@ -4,7 +4,7 @@ Il `PromptManagementSystem` (PMS) è il componente incaricato di centralizzare, 
 
 ## Architettura
 
-Tutti i prompt sono memorizzati in `data/prompts/prompts.yaml`. Questo approccio offre diversi vantaggi:
+Tutti i prompt sono memorizzati in `prompts/prompts.yaml`. Questo approccio offre diversi vantaggi:
 1. **Nessun Hardcoding**: I prompt non sono sparsi nel codice Python, rendendoli più facili da manutenere.
 2. **Templating**: Utilizziamo **Jinja2** per iniettare variabili dinamiche nei prompt (es. i log di errore nel self-healing).
 3. **Disaccoppiamento**: Gli agenti non sanno *cosa* dice il prompt, sanno solo *come* richiederlo via `PromptManager`.

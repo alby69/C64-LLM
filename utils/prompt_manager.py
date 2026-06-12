@@ -3,12 +3,13 @@ import yaml
 from jinja2 import Template
 
 class PromptManager:
-    def __init__(self, prompts_file="data/prompts/prompts.yaml"):
+    def __init__(self, prompts_file="prompts/prompts.yaml"):
         # Cerca il file prompts.yaml in diverse posizioni possibili
         search_paths = [
             prompts_file,
             os.path.join(os.getcwd(), prompts_file),
-            os.path.join(os.path.dirname(__file__), "..", prompts_file)
+            os.path.join(os.path.dirname(__file__), "..", prompts_file),
+            os.path.join(os.getcwd(), "data/prompts/prompts.yaml") # Fallback per retrocompatibilità
         ]
 
         self.prompts = {}

@@ -1,0 +1,217 @@
+sources:
+  # ── già presenti ──────────────────────────────────────────────────────────
+  - name: "C64-Wiki"
+    url: "https://www.c64-wiki.com/wiki/Main_Page"
+    type: "wiki"
+    priority: 1
+    description: "Enciclopedia specializzata con oltre 1800 articoli tecnici e storici."
+
+  - name: "Codebase64"
+    url: "https://codebase64.org/"
+    type: "wiki"
+    priority: 1
+    description: "La wiki più ricca per la programmazione C64, tutorial assembly e demoscene."
+
+  - name: "Zimmers.net Maps"
+    url: "http://www.zimmers.net/anonftp/pub/cbm/maps/"
+    type: "file_listing"
+    priority: 2
+    description: "Archivio storico di mappe di memoria (es. C64.MemoryMap.txt) e documenti tecnici."
+
+  - name: "Ultimate C64 Reference"
+    url: "https://www.pagetable.com/c64ref/"
+    type: "web"
+    priority: 2
+    description: "Disassembly delle ROM, mappe di memoria annotate e documentazione hardware di Michael Steil."
+
+  - name: "Elite Memory Map"
+    url: "https://elite.bbcelite.com/c64/"
+    type: "web"
+    priority: 3
+    description: "Analisi tecnica approfondita del bank switching e della struttura della memoria."
+
+  - name: "CSDb"
+    url: "https://csdb.dk/"
+    type: "database"
+    priority: 2
+    description: "Commodore 64 Scene Database: release, musica SID, demo e sorgenti commentati."
+
+  - name: "HVSC"
+    url: "https://hvsc.c64.org/"
+    type: "database"
+    priority: 3
+    description: "High Voltage SID Collection: oltre 58.000 file SID e documentazione chip audio."
+
+  - name: "Archive.org C64 Programming Books"
+    url: "https://archive.org/details/commodore-64-books"
+    type: "archive_org"
+    priority: 1
+    description: "Manuali originali, Programmer's Reference Guide, Mapping the Commodore 64."
+
+  - name: "Wikipedia C64/6510"
+    url: "https://en.wikipedia.org/wiki/MOS_Technology_6510"
+    type: "web"
+    priority: 2
+    description: "Informazioni sull'architettura della CPU 6510 e bank switching."
+
+  - name: "6502.org"
+    url: "http://www.6502.org/source/"
+    type: "web"
+    priority: 1
+    description: "Enorme archivio di codice sorgente 6502/6510 e tutorial."
+
+  - name: "Lemon64"
+    url: "https://www.lemon64.com/forum/viewforum.php?f=8"
+    type: "forum"
+    priority: 2
+    description: "Database giochi, recensioni e sezione tecnica dedicata al coding."
+
+  - name: "GameBase64"
+    url: "http://www.gamebase64.com/"
+    type: "database"
+    priority: 3
+    description: "Database con oltre 18.000 titoli, recensioni e informazioni tecniche."
+
+  - name: "GitHub mist64/c64ref"
+    url: "https://github.com/mist64/c64ref"
+    type: "github"
+    priority: 2
+    description: "Sorgenti di riferimento machine-readable per Commodore 64."
+
+  - name: "GitHub Andras-vajda/Commodore_64"
+    url: "https://github.com/Andras-vajda/Commodore_64"
+    type: "github"
+    priority: 2
+    description: "Articoli, sorgenti Assembly e manuali CBM Prg Studio."
+
+  - name: "The Fridge"
+    url: "http://www.ffd2.com/fridge/programs/"
+    type: "file_listing"
+    priority: 3
+    description: "Classico archivio di sorgenti Assembly per C64."
+
+  # ── istruzione set CPU ─────────────────────────────────────────────────────
+  - name: "masswerk.at 6502 Instruction Set"
+    url: "https://www.masswerk.at/6502/6502_instruction_set.html"
+    type: "web"
+    priority: 1
+    description: "Reference completo del set di istruzioni MOS 6502/6510: opcode, cicli, flag, modalità di indirizzamento e istruzioni illegali."
+
+  - name: "pagetable.com 6502 Reference"
+    url: "https://www.pagetable.com/c64ref/6502/"
+    type: "web"
+    priority: 1
+    description: "Sezione del progetto c64ref dedicata agli opcode 6502/6510, incluse istruzioni non documentate (undocumented opcodes)."
+
+  - name: "C64 OS — 6502/6510 Instruction Set"
+    url: "https://c64os.com/post/6502instructions"
+    type: "web"
+    priority: 2
+    description: "Reference veloce e ben organizzato delle istruzioni 6502/6510 ottimizzato per la consultazione rapida."
+
+  # ── mappe di memoria aggiuntive ────────────────────────────────────────────
+  - name: "sta.c64.org Memory Map"
+    url: "https://sta.c64.org/cbm64mem.html"
+    type: "web"
+    priority: 1
+    description: "Mappa di memoria C64 molto dettagliata, con descrizione di ogni indirizzo significativo."
+
+  - name: "sta.c64.org CBM Docs"
+    url: "https://sta.c64.org/cbmdocs.html"
+    type: "web"
+    priority: 2
+    description: "Raccolta di documentazione tecnica CBM: mappe, registri chip, Kernal calls e pinout dei chip custom."
+
+  # ── manuali e libri su archive.org ────────────────────────────────────────
+  - name: "Archive.org C64 Manuals (Zimmers mirror)"
+    url: "http://www.zimmers.net/anonftp/pub/cbm/c64/manuals/"
+    type: "file_listing"
+    priority: 1
+    description: "Mirror FUNET dei manuali originali Commodore: Programmer's Reference Guide, Mapping the Commodore 64, Service Manual."
+
+  - name: "Archive.org — Mapping the Commodore 64"
+    url: "https://archive.org/details/The_Master_Memory_Map_for_the_Commodore_64"
+    type: "archive_org"
+    priority: 1
+    description: "Il libro 'Master Memory Map for the Commodore 64' in versione digitale."
+
+  - name: "Archive.org — Machine Language for the C64 (Butterfield)"
+    url: "https://archive.org/search?query=machine+language+commodore+64+butterfield"
+    type: "archive_org"
+    priority: 2
+    description: "Il classico libro di Jim Butterfield 'Machine Language for the Commodore 64'."
+
+  - name: "Archive.org — C64 Programmer's Reference Guide (PDF)"
+    url: "https://archive.org/details/commodore-64-programmers-reference-guide_202205"
+    type: "archive_org"
+    priority: 1
+    description: "Versione PDF ottimizzata del manuale ufficiale Commodore 1983: BASIC V2, machine language, grafica, audio, I/O e sprite."
+
+  # ── riviste tecniche ───────────────────────────────────────────────────────
+  - name: "commodore.ca Magazine Archive"
+    url: "https://www.commodore.ca/commodore-gallery/commodore-magazine-articles/"
+    type: "archive_org"
+    priority: 2
+    description: "Archivio completo e ricercabile (OCR) di Compute!, Compute!'s Gazette e Ahoy! Magazine."
+
+  - name: "The Transactor Archive"
+    url: "https://www.commodore.ca/commodore-gallery/the-transactor-magazine/"
+    type: "archive_org"
+    priority: 2
+    description: "Archivio completo di The Transactor, rivista tecnica canadese sull'hardware Commodore a basso livello (1978-1993)."
+
+  - name: "Archive.org — Zzap!64 Collection"
+    url: "https://archive.org/search?query=zzap+64+magazine"
+    type: "archive_org"
+    priority: 3
+    description: "Collezione digitale di Zzap!64 (UK, 1985-1992): recensioni, poke, trucchi e approfondimenti tecnici sui giochi C64."
+
+  # ── strumenti di sviluppo ──────────────────────────────────────────────────
+  - name: "KickAssembler"
+    url: "http://theweb.dk/KickAssembler/"
+    type: "tool"
+    priority: 1
+    description: "Assembler cross-platform per C64 con scripting avanzato, macro e supporto SID."
+
+  - name: "VICE Emulator"
+    url: "https://vice-emu.sourceforge.io/"
+    type: "tool"
+    priority: 1
+    description: "Emulatore multi-piattaforma per C64. Include monitor machine language per ispezionare memoria e registri."
+
+  - name: "CBM prg Studio"
+    url: "https://www.ajordison.co.uk/"
+    type: "tool"
+    priority: 2
+    description: "IDE Windows per sviluppo C64: editor BASIC e Assembly, sprite editor, charset editor e debugger integrato."
+
+  - name: "Visual 6502"
+    url: "http://visual6502.org/"
+    type: "web"
+    priority: 3
+    description: "Simulazione transistor-level del processore MOS 6502 nel browser."
+
+  - name: "GitHub yackx/c64"
+    url: "https://github.com/yackx/c64"
+    type: "github"
+    priority: 2
+    description: "Progetto pratico di programmazione Assembly 6510 per C64 con assembler ACME e VICE."
+
+  # ── community e forum ──────────────────────────────────────────────────────
+  - name: "Project 64"
+    url: "https://project64.c64.org/"
+    type: "web"
+    priority: 2
+    description: "Archivio di manuali Commodore trascritti in testo puro."
+
+  - name: "Retro64.altervista.org"
+    url: "https://retro64.altervista.org/"
+    type: "web"
+    priority: 3
+    description: "Blog tecnico italiano su programmazione Assembly 6502/6510 per C64 con esempi pratici."
+
+  - name: "bombjack.org Commodore Archive"
+    url: "https://commodore.bombjack.org/"
+    type: "web"
+    priority: 2
+    description: "Ampio archivio di riviste, libri e documentazione Commodore scansionati (64'er, RUN, Power Play, Ahoy!)."
