@@ -7,7 +7,7 @@ A differenza del `ResearcherAgent` che è reattivo (cerca risposte a domande spe
 
 ## Gestione delle Fonti
 L'agente non "vaga" a caso nel web, ma monitora una lista di **Sorgenti Autorevoli** definita nel file di configurazione centrale:
-- **Percorso**: `data/config/crawler_sources.yaml`
+- **Percorso**: `config/crawler_sources.yaml`
 Le fonti supportate includono:
 - **C64-Wiki**: Documentazione enciclopedica.
 - **Codebase64**: Tutorial tecnici e demoscene.
@@ -25,7 +25,7 @@ Il `WebCrawlerAgent` lavora "dietro le quinte" per alimentare il sistema:
 ## Flusso di Lavoro (Pipeline)
 
 1.  **Discovery (Source Monitoring)**:
-    - Legge `crawler_sources.yaml` e controlla `crawler_status.json` per identificare fonti nuove o aggiornate.
+    - Legge `config/crawler_sources.yaml` e controlla lo stato in `data/config/crawler_status.json` per identificare fonti nuove o aggiornate.
     - Utilizza la libreria `internetarchive` per cercare documenti tecnici basati su parole chiave (es. "6502 assembly", "Commodore 64 programmer's reference").
     - Filtra per `mediatype:texts` per garantire la presenza di documenti leggibili.
 

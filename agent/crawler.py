@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WebCrawlerAgent")
 
 class WebCrawlerAgent:
-    def __init__(self, model_backend=None, kb_path="knowledge_base", config_path="data/config/crawler_sources.yaml"):
+    def __init__(self, model_backend=None, kb_path="knowledge_base", config_path="config/crawler_sources.yaml"):
         self.backend = model_backend
         self.pm = PromptManager()
         self.kb_path = Path(kb_path)

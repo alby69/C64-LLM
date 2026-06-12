@@ -11,7 +11,7 @@ Responsabile dell'acquisizione e trasformazione dei dati in un formato adatto al
 - **pdf2text.py**: Estrae testo dai manuali PDF preservando il layout.
 - **text_cleaner.py**: Pulisce il testo estratto, corregge errori comuni di OCR/estrazione e normalizza il codice.
 - **c64_asm_scraper.py / clone_c64_asm.py**: Raccolgono codice sorgente reale da repository GitHub e siti web specializzati.
-- **run_crawler.py**: Pipeline automatizzata per l'acquisizione proattiva di documentazione dalle fonti configurate in `data/config/crawler_sources.yaml` e trasformazione in note Obsidian.
+- **run_crawler.py**: Pipeline automatizzata per l'acquisizione proattiva di documentazione dalle fonti configurate in `config/crawler_sources.yaml` e trasformazione in note Obsidian.
 - **build_dataset.py**: Analizza il testo e il codice sorgente per estrarre blocchi validi e generare coppie istruzione-output in formato JSONL.
 - **train_lora.py**: Esegue il fine-tuning (LoRA) del modello base (Qwen2.5-Coder-1.5B) utilizzando il dataset generato.
 
@@ -19,7 +19,7 @@ Responsabile dell'acquisizione e trasformazione dei dati in un formato adatto al
 Il sistema multi-agente e la logica di ragionamento.
 - **orchestrator.py**: Il coordinatore centrale che gestisce il flusso di lavoro tra gli altri agenti e il self-healing.
 - **researcher.py**: Espande le query dell'utente e recupera contesti tecnici dal Knowledge Engine.
-- **crawler.py**: Agente proattivo per la ricerca e acquisizione di nuova conoscenza dal web, guidato dalla configurazione in `data/config/crawler_sources.yaml`.
+- **crawler.py**: Agente proattivo per la ricerca e acquisizione di nuova conoscenza dal web, guidato dalla configurazione in `config/crawler_sources.yaml`.
 - **coder.py**: Sintetizza codice C64 con personalità specializzate (BASIC/ASM) e ragionamento CoT.
 - **validator.py**: Verifica la correttezza formale del codice generato (Assembly via ACME, BASIC via parser interno).
 - **knowledge_base.py**: Il "Knowledge Engine". Supporta Wiki-links di Obsidian, parsing frontmatter e navigazione del grafo.

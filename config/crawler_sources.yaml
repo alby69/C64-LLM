@@ -1,0 +1,90 @@
+sources:
+  - name: "C64-Wiki"
+    url: "https://www.c64-wiki.com/wiki/Main_Page"
+    type: "wiki"
+    priority: 1
+    description: "Enciclopedia specializzata con oltre 1800 articoli tecnici e storici."
+
+  - name: "Codebase64"
+    url: "https://codebase64.org/"
+    type: "wiki"
+    priority: 1
+    description: "La wiki più ricca per la programmazione C64, tutorial assembly e demoscene."
+
+  - name: "Zimmers.net Maps"
+    url: "http://www.zimmers.net/anonftp/pub/cbm/maps/"
+    type: "file_listing"
+    priority: 2
+    description: "Archivio storico di mappe di memoria (es. C64.MemoryMap.txt) e documenti tecnici."
+
+  - name: "Ultimate C64 Reference"
+    url: "https://www.pagetable.com/c64ref/"
+    type: "web"
+    priority: 2
+    description: "Disassembly delle ROM, mappe di memoria annotate e documentazione hardware di Michael Steil."
+
+  - name: "Elite Memory Map"
+    url: "https://elite.bbcelite.com/c64/"
+    type: "web"
+    priority: 3
+    description: "Analisi tecnica approfondita del bank switching e della struttura della memoria."
+
+  - name: "CSDb"
+    url: "https://csdb.dk/"
+    type: "database"
+    priority: 2
+    description: "Commodore 64 Scene Database: release, musica SID, demo e sorgenti commentati."
+
+  - name: "HVSC"
+    url: "https://hvsc.c64.org/"
+    type: "database"
+    priority: 3
+    description: "High Voltage SID Collection: oltre 58.000 file SID e documentazione chip audio."
+
+  - name: "Archive.org C64 Programming Books"
+    url: "https://archive.org/details/commodore-64-books"
+    type: "archive_org"
+    priority: 1
+    description: "Manuali originali, Programmer's Reference Guide, Mapping the Commodore 64."
+
+  - name: "Wikipedia C64/6510"
+    url: "https://en.wikipedia.org/wiki/MOS_Technology_6510"
+    type: "web"
+    priority: 2
+    description: "Informazioni sull'architettura della CPU 6510 e bank switching."
+
+  - name: "6502.org"
+    url: "http://www.6502.org/source/"
+    type: "web"
+    priority: 1
+    description: "Enorme archivio di codice sorgente 6502/6510 e tutorial."
+
+  - name: "Lemon64"
+    url: "https://www.lemon64.com/forum/viewforum.php?f=8"
+    type: "forum"
+    priority: 2
+    description: "Database giochi, recensioni e sezione tecnica dedicata al coding."
+
+  - name: "GameBase64"
+    url: "http://www.gamebase64.com/"
+    type: "database"
+    priority: 3
+    description: "Database con oltre 18.000 titoli, recensioni e informazioni tecniche."
+
+  - name: "GitHub mist64/c64ref"
+    url: "https://github.com/mist64/c64ref"
+    type: "github"
+    priority: 2
+    description: "Sorgenti di riferimento machine-readable per Commodore 64."
+
+  - name: "GitHub Andras-vajda/Commodore_64"
+    url: "https://github.com/Andras-vajda/Commodore_64"
+    type: "github"
+    priority: 2
+    description: "Articoli, sorgenti Assembly e manuali CBM Prg Studio."
+
+  - name: "The Fridge"
+    url: "http://www.ffd2.com/fridge/programs/"
+    type: "file_listing"
+    priority: 3
+    description: "Classico archivio di sorgenti Assembly per C64."
