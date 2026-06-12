@@ -15,9 +15,17 @@ class WebCrawlerAgent:
         self.pm = PromptManager()
         self.kb_path = Path(kb_path)
         self.kb_path.mkdir(parents=True, exist_ok=True)
+
+        # Assicura che le cartelle di configurazione esistano
         self.config_path = Path(config_path)
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Cartella temporanea per download
+        self.tmp_path = Path("data/tmp")
+        self.tmp_path.mkdir(parents=True, exist_ok=True)
+
         self.sources = self._load_sources()
-        self.status_file = Path("data/config/crawler_status.json")
+        self.status_file = self.config_path.parent / "crawler_status.json"
 
     def _load_sources(self):
         """Carica la lista delle fonti dal file YAML."""
