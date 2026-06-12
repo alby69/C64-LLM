@@ -19,7 +19,7 @@ Il sistema multi-agente e la logica di ragionamento.
 - **orchestrator.py**: Il coordinatore centrale che gestisce il flusso di lavoro tra gli altri agenti e il self-healing.
 - **researcher.py**: Espande le query dell'utente e recupera contesti tecnici dal Knowledge Engine.
 - **coder.py**: Sintetizza codice C64 con personalità specializzate (BASIC/ASM) e ragionamento CoT.
-- **validator.py**: Verifica la correttezza formale del codice generato.
+- **validator.py**: Verifica la correttezza formale del codice generato (Assembly via ACME, BASIC via parser interno).
 - **knowledge_base.py**: Il "Knowledge Engine". Supporta Wiki-links di Obsidian, parsing frontmatter e navigazione del grafo.
 - **model_backend.py**: Astrazione del backend LLM. Supporta Transformers (GPU/4-bit) e LlamaCpp (CPU/GGUF).
 - **agent_pro.py**: Punto di ingresso Gradio. Fornisce Prompt Library e visualizzazione del percorso di ricerca.

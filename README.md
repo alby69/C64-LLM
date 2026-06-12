@@ -45,6 +45,7 @@ Per maggiori dettagli, consulta la cartella `docs/`:
 - [REFACTORING.md](docs/REFACTORING.md): Dettagli sulla transizione al sistema multi-agente.
 - [RESEARCHER_DEEP_DIVE.md](docs/RESEARCHER_DEEP_DIVE.md): Funzionamento del Researcher.
 - [CODER_DEEP_DIVE.md](docs/CODER_DEEP_DIVE.md): Strategie di generazione del Coder.
+- [IMPLEMENTATION_PLAN_AGENTS.md](docs/IMPLEMENTATION_PLAN_AGENTS.md): Piano dettagliato per le evoluzioni future degli agenti.
 
 ---
 *Progetto sviluppato per preservare e potenziare l'arte della programmazione su sistemi 8-bit.*

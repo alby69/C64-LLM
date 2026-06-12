@@ -26,5 +26,5 @@ Questo documento dettaglia la strategia per far evolvere il progetto C64-LLM ver
 ## Prossimi Passi Suggeriti
 
 1. **Espansione Knowledge Base**: Aggiungere più note tecniche su SID e VIC-II.
-2. **BASIC 2.0 Linter**: Un controllo ancora più severo sulle restrizioni del BASIC v2 (es. memoria riservata).
+2. **Potenziamento Agenti**: Implementazione di Reranking, HyDE e Linter simbolici (Vedi [IMPLEMENTATION_PLAN_AGENTS.md](IMPLEMENTATION_PLAN_AGENTS.md)).
 3. **Multi-step Reasoning**: Permettere all'Orchestratore di pianificare task complessi in più round.
