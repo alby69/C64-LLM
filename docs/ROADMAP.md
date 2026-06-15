@@ -26,7 +26,7 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - [x] **Use Cases Documentati**: Aggiungere esempi reali di interazione nel README. (Implementato in `docs/USE_CASES.md`)
 
 ### 3. Documentazione (Consolidamento)
-- [ ] **Unificazione Technical Manual**: Unificare i vari `DEEP_DIVE` in un unico manuale tecnico.
+- [x] **Unificazione Technical Manual**: Unificare i vari `DEEP_DIVE` in un unico manuale tecnico. (Implementato in `docs/TECHNICAL_MANUAL.md`)
 - [x] **Aggiornamento README**: Inseriti link a Use Cases e Roadmap. (Completato)
 
 ---
@@ -34,8 +34,8 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 ## 🚀 Prossimi Passi (Evoluzione Futura)
 
 - [ ] **Reranking semantico**: Migliorare la precisione del RAG con un cross-encoder.
-- [ ] **HyDE (Hypothetical Document Embeddings)**: Migliorare il recupero di documenti tecnici complessi.
-- [ ] **Cycle Counter per Assembly**: Analisi delle performance del codice generato.
+- [x] **HyDE (Hypothetical Document Embeddings)**: Migliorare il recupero di documenti tecnici complessi. (Implementato)
+- [x] **Cycle Counter per Assembly**: Analisi delle performance del codice generato. (Implementato in `utils/cycle_counter.py`)
 
 ---
 

@@ -62,10 +62,12 @@ class OrchestratorAgent:
         context = ""
         sources = []
         if use_rag:
-            msg = "[Orchestrator] Avvio fase di ricerca..."
+            msg = "[Orchestrator] Avvio fase di ricerca (RAG + HyDE)..."
             print(msg)
             logs.append(msg)
-            context = self.researcher.research(user_query, chat_history=chat_history)
+
+            use_hyde = self.pm.get_config("rag.use_hyde", True)
+            context = self.researcher.research(user_query, chat_history=chat_history, use_hyde=use_hyde)
             sources = re.findall(r"Sorgente: (.*?)\)", context)
 
         # Suggerimento proattivo della memoria

@@ -1,5 +1,6 @@
 import re
 from utils.validate_emulator import test_asm_code
+from utils.cycle_counter import CycleCounter
 
 class ValidatorAgent:
     def __init__(self):
@@ -209,6 +210,13 @@ class ValidatorAgent:
                     continue
 
                 success, log = test_asm_code(code)
+
+                # Aggiungi stima cicli se la compilazione è ok
+                if success:
+                    counter = CycleCounter()
+                    total, _ = counter.estimate_cycles(code)
+                    log += f"\nPerformance stimata: ~{total} cicli di clock."
+
                 results.append((success, log))
             elif any(instr in code.upper() for instr in ["PRINT", "GOTO", "POKE", "PEEK", "SYS", "REM"]) or re.match(r'^\d+\s', code.strip()):
                 success, log = self.validate_basic(code)

@@ -8,6 +8,7 @@ agent:
 rag:
   k_results: 3
   follow_links: true
+  use_hyde: true
   chunk_size: 500
   chunk_overlap: 50
 
