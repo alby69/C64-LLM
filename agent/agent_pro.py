@@ -218,9 +218,11 @@ def download_and_integrate(url):
 
     is_pdf = url.lower().endswith(".pdf")
     is_d64 = url.lower().endswith(".d64")
+    is_prg = url.lower().endswith(".prg")
+    is_g64 = url.lower().endswith(".g64")
     is_archive = "archive.org" in url
 
-    if is_pdf or is_d64 or is_archive:
+    if is_pdf or is_d64 or is_prg or is_g64 or is_archive:
         dest = "data/input"
         os.makedirs(dest, exist_ok=True)
 
@@ -239,13 +241,17 @@ def download_and_integrate(url):
             files = meta.get("files", [])
 
             d64_files = [f for f in files if f["name"].lower().endswith(".d64")]
+            g64_files = [f for f in files if f["name"].lower().endswith(".g64")]
+            prg_files = [f for f in files if f["name"].lower().endswith(".prg")]
             pdf_files = [f for f in files if f["name"].lower().endswith(".pdf")]
 
-            if d64_files:
-                yield log_msg(f"Trovati {len(d64_files)} file D64. Download...")
+            disk_files = d64_files + g64_files + prg_files
+
+            if disk_files:
+                yield log_msg(f"Trovati {len(disk_files)} file disco/PRG. Download...")
                 subdir = os.path.join(dest, item_id)
                 os.makedirs(subdir, exist_ok=True)
-                for df in d64_files:
+                for df in disk_files:
                     fname = df["name"]
                     dl_url = f"https://archive.org/download/{item_id}/{fname}"
                     yield log_msg(f"  Download: {fname}")
@@ -255,11 +261,17 @@ def download_and_integrate(url):
                     with open(local, "wb") as f:
                         for chunk in r.iter_content(8192):
                             f.write(chunk)
-                    yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{local}\" \"{subdir}\"")
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext == ".d64":
+                        yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{local}\" \"{subdir}\"")
+                    elif ext == ".g64":
+                        yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{local}\" \"{subdir}\"")
+                    elif ext == ".prg":
+                        yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{local}\" \"{subdir}\"")
 
             if pdf_files:
                 yield log_msg(f"Trovati {len(pdf_files)} PDF. Download...")
-                subdir = os.path.join(dest, item_id) if not d64_files else subdir
+                subdir = os.path.join(dest, item_id) if not disk_files else subdir
                 os.makedirs(subdir, exist_ok=True)
                 for pf in pdf_files[:5]:
                     fname = pf["name"]
@@ -272,8 +284,8 @@ def download_and_integrate(url):
                         for chunk in r.iter_content(8192):
                             f.write(chunk)
 
-            if not d64_files and not pdf_files:
-                yield log_msg("Nessun file D64 o PDF trovato in questo item.")
+            if not disk_files and not pdf_files:
+                yield log_msg("Nessun file D64/G64/PRG/PDF trovato in questo item.")
                 CTRL.running = False
                 return
 
@@ -288,6 +300,30 @@ def download_and_integrate(url):
                     f.write(chunk)
             yield log_msg(f"D64 scaricato: {path}")
             yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{path}\" \"{dest}\"")
+
+        elif is_g64:
+            yield log_msg("Download G64...")
+            r = req.get(url, stream=True, timeout=60, verify=False)
+            r.raise_for_status()
+            fname = url.split("/")[-1] or "disk.g64"
+            path = os.path.join(dest, fname)
+            with open(path, "wb") as f:
+                for chunk in r.iter_content(8192):
+                    f.write(chunk)
+            yield log_msg(f"G64 scaricato: {path}")
+            yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{path}\" \"{dest}\"")
+
+        elif is_prg:
+            yield log_msg("Download PRG...")
+            r = req.get(url, stream=True, timeout=60, verify=False)
+            r.raise_for_status()
+            fname = url.split("/")[-1] or "program.prg"
+            path = os.path.join(dest, fname)
+            with open(path, "wb") as f:
+                for chunk in r.iter_content(8192):
+                    f.write(chunk)
+            yield log_msg(f"PRG scaricato: {path}")
+            yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{path}\" \"{dest}\"")
 
         else:
             yield log_msg("Download PDF...")
@@ -341,6 +377,12 @@ def download_and_integrate(url):
                     pdf_count += 1
                     if CTRL.cancelled:
                         return
+                elif fname.lower().endswith(".d64"):
+                    yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{os.path.join(root, fname)}\" \"{root}\"")
+                elif fname.lower().endswith(".g64"):
+                    yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{os.path.join(root, fname)}\" \"{root}\"")
+                elif fname.lower().endswith(".prg"):
+                    yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{os.path.join(root, fname)}\" \"{root}\"")
 
         if pdf_count == 0:
             yield log_msg("Nessun PDF trovato.")

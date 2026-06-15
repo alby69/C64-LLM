@@ -50,12 +50,12 @@ class C64KnowledgeBase:
             loader_txt = TextLoader(clean_txt)
             documents.extend(loader_txt.load())
 
-        # BASIC extracted from D64
+        # BASIC extracted from D64/G64 and ML dumps
         input_dir = "data/input"
         if os.path.exists(input_dir):
             for root, _, files in os.walk(input_dir):
                 for fname in files:
-                    if fname.endswith(".bas.txt"):
+                    if fname.endswith(".bas.txt") or fname.endswith(".ml.txt"):
                         path = os.path.join(root, fname)
                         with open(path, 'r') as f:
                             content = f.read()
