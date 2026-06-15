@@ -682,6 +682,8 @@ def launch_ui():
 
         with gr.Tab("Dati"):
             gr.Markdown("## Gestione dati e manutenzione")
+            info_log = gr.Textbox(label="", lines=16)
+
             with gr.Row():
                 with gr.Column(scale=1):
                     gr.Markdown("### Knowledge Base")
@@ -706,8 +708,6 @@ def launch_ui():
                         allow_custom_value=True,
                     )
                     preview_btn = gr.Button("Visualizza", size="sm")
-
-            info_log = gr.Textbox(label="", lines=16)
 
             list_btn.click(fn=list_kb_files, outputs=info_log)
             preview_btn.click(fn=preview_kb_file, inputs=file_dropdown, outputs=info_log)
