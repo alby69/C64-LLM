@@ -5,10 +5,12 @@ from agent.model_backend import ModelBackend
 class ResearcherAgent:
     def __init__(self, model=None, tokenizer=None):
         self.kb = C64KnowledgeBase()
-        if not isinstance(model, ModelBackend) and model is not None:
+        if model is not None and hasattr(model, 'generate'):
+            self.backend = model
+        elif model is not None:
             self.backend = ModelBackend(model, tokenizer)
         else:
-            self.backend = model
+            self.backend = None
         self.pm = PromptManager()
 
     def expand_query(self, query, chat_history=None):

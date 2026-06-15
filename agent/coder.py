@@ -3,10 +3,12 @@ from agent.model_backend import ModelBackend
 
 class CoderAgent:
     def __init__(self, model, tokenizer):
-        if not isinstance(model, ModelBackend) and model is not None:
+        if model is not None and hasattr(model, 'generate'):
+            self.backend = model
+        elif model is not None:
             self.backend = ModelBackend(model, tokenizer)
         else:
-            self.backend = model
+            self.backend = None
         self.pm = PromptManager()
         self.system_prompt = self.pm.get_prompt("coder.base.system")
 
