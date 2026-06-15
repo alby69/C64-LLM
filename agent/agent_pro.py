@@ -418,6 +418,70 @@ def on_rebuild():
         return f"[ERRORE] {e}"
 
 
+KB_DIRS = [
+    ("knowledge_base", "File Markdown (.md)"),
+    ("data/input", "File estratti (.bas.txt, .ml.txt)"),
+    ("data/src", "File scraper (.asm)"),
+]
+
+
+def list_kb_files():
+    lines = []
+    for directory, label in KB_DIRS:
+        if not os.path.exists(directory):
+            lines.append(f"  {label}: (cartella assente)")
+            continue
+        files = []
+        for root, _, fnames in os.walk(directory):
+            for f in fnames:
+                fp = os.path.join(root, f)
+                sz = os.path.getsize(fp)
+                files.append((fp, sz))
+        files.sort(key=lambda x: -x[1])
+        lines.append(f"\n📁 {label} ({len(files)} file):")
+        for fp, sz in files:
+            sz_str = f"{sz}B" if sz < 1024 else f"{sz/1024:.1f}KB" if sz < 1048576 else f"{sz/1048576:.1f}MB"
+            rel = fp[len(directory)+1:] if fp.startswith(directory) else fp
+            lines.append(f"    {rel:60s} {sz_str:>8s}")
+    return "\n".join(lines)
+
+
+def preview_kb_file(rel_path):
+    if not rel_path:
+        return "Seleziona un file."
+    full_path = None
+    for directory, _ in KB_DIRS:
+        candidate = os.path.join(directory, rel_path)
+        if os.path.exists(candidate):
+            full_path = candidate
+            break
+    if not full_path:
+        return f"File non trovato: {rel_path}"
+    try:
+        with open(full_path, "r") as f:
+            content = f.read()
+        sz = os.path.getsize(full_path)
+        lines = content.split("\n")
+        preview = "\n".join(lines[:50])
+        extra = f"\n\n... ({len(lines) - 50} righe in piu', {sz} byte totali)" if len(lines) > 50 else ""
+        return f"--- {rel_path} ({sz} byte) ---\n\n{preview}{extra}"
+    except Exception as e:
+        return f"Errore lettura: {e}"
+
+
+def all_kb_file_choices():
+    choices = []
+    for directory, _ in KB_DIRS:
+        if not os.path.exists(directory):
+            continue
+        for root, _, fnames in os.walk(directory):
+            for f in fnames:
+                rel = os.path.relpath(os.path.join(root, f), directory)
+                label = f"{directory}/{rel}"
+                choices.append(label)
+    return sorted(choices)
+
+
 def on_status():
     lines = []
     for path, label in [
@@ -618,8 +682,6 @@ def launch_ui():
 
         with gr.Tab("Dati"):
             gr.Markdown("## Gestione dati e manutenzione")
-            info_log = gr.Textbox(label="", lines=12)
-
             with gr.Row():
                 with gr.Column(scale=1):
                     gr.Markdown("### Knowledge Base")
@@ -634,6 +696,21 @@ def launch_ui():
                     gr.Markdown("### Statistiche")
                     status_btn = gr.Button("Aggiorna")
                     status_btn.click(fn=on_status, outputs=info_log)
+
+                with gr.Column(scale=2):
+                    gr.Markdown("### Esplora file KB")
+                    list_btn = gr.Button("Elenca tutti i file", size="sm")
+                    file_dropdown = gr.Dropdown(
+                        choices=lambda: all_kb_file_choices(),
+                        label="Anteprima file",
+                        allow_custom_value=True,
+                    )
+                    preview_btn = gr.Button("Visualizza", size="sm")
+
+            info_log = gr.Textbox(label="", lines=16)
+
+            list_btn.click(fn=list_kb_files, outputs=info_log)
+            preview_btn.click(fn=preview_kb_file, inputs=file_dropdown, outputs=info_log)
 
     demo.launch(server_name="0.0.0.0", theme=gr.themes.Soft())
 
