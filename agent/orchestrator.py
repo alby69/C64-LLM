@@ -39,61 +39,62 @@ class OrchestratorAgent:
 
         return "Suggerimento: Assicurati di dichiarare esplicitamente l'indirizzo di inizio con * = $XXXX."
 
-    def process_request(self, user_query, use_rag=True, chat_history=None):
-        """Coordina il flusso di lavoro tra i vari agenti."""
+    def process_request(self, user_query, use_rag=True, chat_history=None, max_attempts=3):
+        """Coordina il flusso di lavoro tra i vari agenti con multi-round self-healing."""
 
         # 1. Fase di Ricerca
         context = ""
         sources = []
         if use_rag:
             print("[Orchestrator] Avvio fase di ricerca...")
-            # Passa la cronologia se disponibile (Evolution: Multi-turn)
             context = self.researcher.research(user_query, chat_history=chat_history)
-            # Estrarre le sorgenti per la UI (semplificato)
             sources = re.findall(r"Sorgente: (.*?)\)", context)
 
         # Suggerimento proattivo della memoria
         mem_suggestion = self._suggest_memory_area(user_query, context)
-
-        # Aggiungi informazioni sulla memoria attuale al contesto
         mem_context = f"\nMAPPA MEMORIA ATTUALE:\n{self.memory_tracker.get_summary()}\n{mem_suggestion}\n"
         full_context_for_coder = context + mem_context
 
-        # 2. Fase di Codifica
-        print("[Orchestrator] Avvio generazione risposta/codice...")
-        initial_response = self.coder.generate_code(user_query, full_context_for_coder)
+        # 2. Ciclo di Generazione e Validazione (Self-healing)
+        current_query = user_query
+        current_context = full_context_for_coder
+        attempts = 0
+        last_response = ""
 
-        # 3. Fase di Validazione
-        print("[Orchestrator] Validazione del codice generato...")
-        success, log = self.validator.validate(initial_response)
+        while attempts < max_attempts:
+            attempts += 1
+            print(f"[Orchestrator] Tentativo {attempts} di generazione...")
 
-        # Estrarre eventuali allocazioni di memoria dal codice (euristica semplice)
-        self._track_memory_from_code(initial_response)
+            response = self.coder.generate_code(current_query, current_context)
+            last_response = response
 
-        if success:
-            return initial_response, sources
-        else:
-            # 4. Fase di Self-healing
-            print(f"[Orchestrator] Validazione fallita. Tentativo di correzione...\nLog: {log}")
-            correction_query = self.pm.get_prompt("orchestrator.self_healing.user_template", log=log)
+            print(f"[Orchestrator] Validazione del codice (Tentativo {attempts})...")
+            success, log = self.validator.validate(response)
 
-            full_context = f"{full_context_for_coder}\n\nRisposta precedente errata:\n{initial_response}"
-            corrected_response = self.coder.generate_code(correction_query, full_context)
+            if success:
+                self._track_memory_from_code(response)
+                if attempts > 1:
+                    return f"Nota: Il codice è stato corretto dopo {attempts-1} tentativi.\n\n{response}", sources
+                return response, sources
 
-            # Ri-validiamo
-            print("[Orchestrator] Validazione del codice corretto...")
-            success_fixed, log_fixed = self.validator.validate(corrected_response)
+            print(f"[Orchestrator] Validazione fallita: {log}")
 
-            if success_fixed:
-                self._track_memory_from_code(corrected_response)
-                return f"Nota: Il primo tentativo conteneva errori, ecco la versione corretta:\n\n{corrected_response}", sources
-            else:
-                return f"Attenzione: Non è stato possibile generare codice valido dopo un tentativo di correzione.\n\nUltima versione generata:\n{corrected_response}\n\nErrori:\n{log_fixed}", sources
+            # Prepariamo la correzione per il prossimo round
+            current_query = self.pm.get_prompt("orchestrator.self_healing.user_template", log=log)
+            current_context = f"{full_context_for_coder}\n\nRisposta precedente errata:\n{response}"
+
+        return f"Attenzione: Non è stato possibile generare codice valido dopo {max_attempts} tentativi.\n\nUltima versione generata:\n{last_response}\n\nErrori:\n{log}", sources
 
     def _track_memory_from_code(self, text):
         """Tenta di estrarre direttive * = o numeri di riga BASIC per tracciare la memoria."""
-        # Esempio Assembly: * = $1000
-        asm_org = re.findall(r'\* = \$([0-9A-Fa-f]{4})', text)
+        # Esempio Assembly: * = $1000 o *=$1000
+        asm_org = re.findall(r'\*\s*=\s*\$([0-9A-Fa-f]{4})', text)
         for addr in asm_org:
             start = int(addr, 16)
-            self.memory_tracker.add_allocation(start, start + 0x100, "Codice/Dati Assembly")
+            # Stimiamo 256 byte per ora se non sappiamo la fine,
+            # ma potremmo migliorare analizzando tutto il blocco
+            self.memory_tracker.add_allocation(start, start + 0xFF, "Codice/Dati Assembly")
+
+        # BASIC: Numeri di riga (solo per segnalare occupazione area BASIC standard)
+        if re.search(r'^\d+\s+', text, re.MULTILINE):
+            self.memory_tracker.add_allocation(0x0801, 0x9FFF, "Programma BASIC")
