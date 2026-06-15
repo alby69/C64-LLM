@@ -10,6 +10,7 @@ class ValidatorAgent:
         lines = code.strip().split('\n')
         errors = []
         line_numbers = []
+        all_variables = {} # short_name: full_name
 
         for i, line in enumerate(lines):
             line = line.strip()
@@ -20,26 +21,39 @@ class ValidatorAgent:
             match = re.match(r'^(\d+)\s+(.*)', line)
             if not match:
                 errors.append(f"Linea {i+1}: Manca il numero di riga o formato errato.")
-            else:
-                num = int(match.group(1))
-                content = match.group(2)
+                continue
 
-                # Verifica ordine numeri di riga
-                if line_numbers and num <= line_numbers[-1]:
-                    errors.append(f"Linea {num}: Numero di riga non sequenziale.")
-                line_numbers.append(num)
+            num = int(match.group(1))
+            content = match.group(2)
 
-                # 2. Verifica lunghezza variabile (max 2 caratteri significativi)
-                # Nota: il BASIC C64 accetta variabili lunghe ma considera solo i primi 2 caratteri.
-                # Spesso è fonte di bug (es. SCORE1 e SCORE2 sono la stessa variabile).
-                variables = re.findall(r'\b([A-Z][A-Z0-9]?)([A-Z0-9]+)\b', content.upper())
-                keywords = ["PRINT", "GOTO", "GOSUB", "RETURN", "IF", "THEN", "FOR", "NEXT", "STEP", "INPUT", "POKE", "PEEK", "SYS", "REM", "DATA", "READ", "RESTORE"]
-                for v_prefix, v_suffix in variables:
-                    full_var = v_prefix + v_suffix
-                    if full_var not in keywords and len(full_var) > 2:
-                        # Potremmo segnalare come warning, ma per ora lo lasciamo come nota nel log se utile
-                        # In BASIC v2, SCORE1 e SCORE2 sono la stessa variabile (SC)
-                        pass
+            # Verifica ordine numeri di riga
+            if line_numbers and num <= line_numbers[-1]:
+                errors.append(f"Linea {num}: Numero di riga non sequenziale.")
+            line_numbers.append(num)
+
+            # 2. Verifica lunghezza variabile e collisioni (max 2 caratteri significativi)
+            # In BASIC v2, SCORE1 e SCORE2 sono la stessa variabile (SC)
+            # Includiamo % per interi e $ per stringhe
+            words = re.findall(r'\b[A-Z][A-Z0-9]*[%$]?\b', content.upper())
+            keywords = ["PRINT", "GOTO", "GOSUB", "RETURN", "IF", "THEN", "FOR", "NEXT", "STEP", "INPUT", "POKE", "PEEK", "SYS", "REM", "DATA", "READ", "RESTORE", "AND", "OR", "NOT", "TAB", "SPC", "THEN", "TO", "STEP", "END", "STOP", "CONT", "LIST", "RUN", "NEW", "LOAD", "SAVE", "VERIFY", "DEF", "FN", "DIM", "LET"]
+
+            for word in words:
+                # Pulisci eventuale suffisso per il confronto con keyword ma mantieni per variabile
+                base_word = word.rstrip('%$')
+                if base_word not in keywords:
+                    # Il nome corto include il suffisso se presente, es: A$ -> A$, AB$ -> AB$
+                    suffix = word[-1] if word[-1] in "%$" else ""
+                    base_name = word[:-1] if suffix else word
+                    short_name = base_name[:2] + suffix
+
+                    if short_name in all_variables and all_variables[short_name] != word:
+                        errors.append(f"Linea {num}: Potenziale collisione di variabili '{word}' e '{all_variables[short_name]}' (entrambe viste come '{short_name}').")
+                    else:
+                        all_variables[short_name] = word
+
+            # 3. Verifica lunghezza linea (max ~80 caratteri per riga logica comodità, anche se C64 arriva a 80)
+            if len(line) > 80:
+                errors.append(f"Linea {num}: La linea è molto lunga ({len(line)} caratteri). Sul C64 il limite è solitamente 80 caratteri per riga logica.")
 
             # 3.1 Controllo Limiti POKE/PEEK
             # POKE address, value

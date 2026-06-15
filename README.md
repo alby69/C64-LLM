@@ -39,8 +39,10 @@ pip install -r requirements.txt
 python -m agent.agent_pro
 ```
 
-## 📖 Documentazione
+## 📖 Documentazione e Casi d'Uso
 Per maggiori dettagli, consulta la cartella `docs/`:
+- [USE_CASES.md](docs/USE_CASES.md): **Esempi pratici di utilizzo (Assembly e BASIC).**
+- [ROADMAP.md](docs/ROADMAP.md): Stato dello sviluppo e piani futuri.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Panoramica del sistema.
 - [REFACTORING.md](docs/REFACTORING.md): Dettagli sulla transizione al sistema multi-agente.
 - [RESEARCHER_DEEP_DIVE.md](docs/RESEARCHER_DEEP_DIVE.md): Funzionamento del Researcher.

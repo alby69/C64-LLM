@@ -46,14 +46,29 @@ class C64CodingAgent:
         self.orchestrator = OrchestratorAgent(self.backend, self.tokenizer)
         self.pm = PromptManager()
 
-    def chat_wrapper(self, message, history, use_rag):
-        response, sources = self.orchestrator.process_request(message, use_rag=use_rag)
+    def chat_wrapper(self, message, history, use_rag, max_attempts):
+        # Converti la history di Gradio nel formato previsto dall'Orchestrator se necessario
+        # Gradio history è [[user, bot], ...]
+        formatted_history = []
+        for user_msg, bot_msg in history:
+            formatted_history.append({"role": "user", "content": user_msg})
+            formatted_history.append({"role": "assistant", "content": bot_msg})
 
-        source_text = ""
-        if sources:
-            source_text = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in sources])
+        try:
+            response, sources = self.orchestrator.process_request(
+                message,
+                use_rag=use_rag,
+                chat_history=formatted_history,
+                max_attempts=int(max_attempts)
+            )
 
-        return response + source_text
+            source_text = ""
+            if sources:
+                source_text = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in set(sources)])
+
+            return response + source_text
+        except Exception as e:
+            return f"❌ Errore durante l'elaborazione: {str(e)}"
 
 def launch_ui():
     lora = os.environ.get("LORA_PATH")
@@ -78,7 +93,8 @@ def launch_ui():
                 chat_interface = gr.ChatInterface(
                     agent.chat_wrapper,
                     additional_inputs=[
-                        gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True)
+                        gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True),
+                        gr.Slider(minimum=1, maximum=5, value=3, step=1, label="Tentativi Self-Healing")
                     ]
                 )
             with gr.Column(scale=1):
