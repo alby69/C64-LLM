@@ -7,22 +7,37 @@ from utils.prompt_manager import PromptManager
 class MemoryMapTracker:
     """Semplice tracker per la memoria del C64 per evitare collisioni."""
     def __init__(self):
-        self.allocations = {} # {address_range: purpose}
+        self.allocations = [] # Lista di dizionari {start, end, purpose}
 
     def add_allocation(self, start, end, purpose):
-        self.allocations[f"{start:04X}-{end:04X}"] = purpose
+        # Controlla collisioni
+        collision = self.check_collision(start, end)
+        if collision:
+            print(f"[MemoryMapTracker] ATTENZIONE: Collisione rilevata tra ${start:04X}-${end:04X} ({purpose}) e {collision}")
+
+        self.allocations.append({
+            "start": start,
+            "end": end,
+            "purpose": purpose
+        })
+
+    def check_collision(self, start, end):
+        for alloc in self.allocations:
+            if not (end < alloc["start"] or start > alloc["end"]):
+                return f"${alloc['start']:04X}-${alloc['end']:04X} ({alloc['purpose']})"
+        return None
 
     def get_summary(self):
         if not self.allocations:
             return "Nessuna allocazione registrata."
-        return "\n".join([f"- {addr}: {purp}" for addr, purp in self.allocations.items()])
+        return "\n".join([f"- ${a['start']:04X}-${a['end']:04X}: {a['purpose']}" for a in self.allocations])
 
 class OrchestratorAgent:
-    def __init__(self, model, tokenizer):
+    def __init__(self, model, tokenizer, pm=None):
         self.researcher = ResearcherAgent(model, tokenizer)
         self.coder = CoderAgent(model, tokenizer)
         self.validator = ValidatorAgent()
-        self.pm = PromptManager()
+        self.pm = pm if pm else PromptManager()
         self.memory_tracker = MemoryMapTracker()
 
     def _suggest_memory_area(self, user_query, context):
@@ -41,18 +56,28 @@ class OrchestratorAgent:
 
     def process_request(self, user_query, use_rag=True, chat_history=None, max_attempts=3):
         """Coordina il flusso di lavoro tra i vari agenti con multi-round self-healing."""
+        logs = []
 
         # 1. Fase di Ricerca
         context = ""
         sources = []
         if use_rag:
-            print("[Orchestrator] Avvio fase di ricerca...")
+            msg = "[Orchestrator] Avvio fase di ricerca..."
+            print(msg)
+            logs.append(msg)
             context = self.researcher.research(user_query, chat_history=chat_history)
             sources = re.findall(r"Sorgente: (.*?)\)", context)
 
         # Suggerimento proattivo della memoria
         mem_suggestion = self._suggest_memory_area(user_query, context)
-        mem_context = f"\nMAPPA MEMORIA ATTUALE:\n{self.memory_tracker.get_summary()}\n{mem_suggestion}\n"
+
+        # Check per sovrapposizioni critiche (vettori di sistema)
+        system_collision = self.memory_tracker.check_collision(0x0314, 0x0315) # IRQ Vector
+        collision_warning = ""
+        if system_collision:
+            collision_warning = f"\nATTENZIONE: Il codice precedente ha modificato i vettori di sistema ({system_collision}). Assicurati di gestire bene le interruzioni.\n"
+
+        mem_context = f"\nMAPPA MEMORIA ATTUALE:\n{self.memory_tracker.get_summary()}\n{collision_warning}{mem_suggestion}\n"
         full_context_for_coder = context + mem_context
 
         # 2. Ciclo di Generazione e Validazione (Self-healing)
@@ -63,27 +88,34 @@ class OrchestratorAgent:
 
         while attempts < max_attempts:
             attempts += 1
-            print(f"[Orchestrator] Tentativo {attempts} di generazione...")
+            msg = f"[Orchestrator] Tentativo {attempts} di generazione..."
+            print(msg)
+            logs.append(msg)
 
             response = self.coder.generate_code(current_query, current_context)
             last_response = response
 
-            print(f"[Orchestrator] Validazione del codice (Tentativo {attempts})...")
+            msg = f"[Orchestrator] Validazione del codice (Tentativo {attempts})..."
+            print(msg)
+            logs.append(msg)
             success, log = self.validator.validate(response)
 
             if success:
                 self._track_memory_from_code(response)
+                final_response = response
                 if attempts > 1:
-                    return f"Nota: Il codice è stato corretto dopo {attempts-1} tentativi.\n\n{response}", sources
-                return response, sources
+                    final_response = f"Nota: Il codice è stato corretto dopo {attempts-1} tentativi.\n\n{response}"
+                return final_response, sources, logs
 
-            print(f"[Orchestrator] Validazione fallita: {log}")
+            msg = f"[Orchestrator] Validazione fallita: {log}"
+            print(msg)
+            logs.append(msg)
 
             # Prepariamo la correzione per il prossimo round
             current_query = self.pm.get_prompt("orchestrator.self_healing.user_template", log=log)
             current_context = f"{full_context_for_coder}\n\nRisposta precedente errata:\n{response}"
 
-        return f"Attenzione: Non è stato possibile generare codice valido dopo {max_attempts} tentativi.\n\nUltima versione generata:\n{last_response}\n\nErrori:\n{log}", sources
+        return f"Attenzione: Non è stato possibile generare codice valido dopo {max_attempts} tentativi.\n\nUltima versione generata:\n{last_response}\n\nErrori:\n{log}", sources, logs
 
     def _track_memory_from_code(self, text):
         """Tenta di estrarre direttive * = o numeri di riga BASIC per tracciare la memoria."""
