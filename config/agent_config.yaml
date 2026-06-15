@@ -1,0 +1,22 @@
+agent:
+  max_attempts: 3
+  model_name: "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+  temperature: 0.3
+  top_p: 0.9
+  max_new_tokens: 512
+
+rag:
+  k_results: 3
+  follow_links: true
+  use_hyde: true
+  chunk_size: 500
+  chunk_overlap: 50
+
+ui:
+  theme: "soft"
+  show_sources: true
+  prompt_library:
+    - "Come posso cambiare il colore del bordo?"
+    - "Esegui un ciclo in BASIC per muovere uno sprite"
+    - "Configura un raster interrupt a riga 100"
+    - "Pulisci lo schermo in Assembly"

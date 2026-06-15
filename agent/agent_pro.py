@@ -43,26 +43,45 @@ class C64CodingAgent:
                 self.backend = LlamaCppBackend(gguf_path)
                 self.tokenizer = None
 
-        self.orchestrator = OrchestratorAgent(self.backend, self.tokenizer)
         self.pm = PromptManager()
+        self.orchestrator = OrchestratorAgent(self.backend, self.tokenizer, pm=self.pm)
 
-    def chat_wrapper(self, message, history, use_rag):
-        response, sources = self.orchestrator.process_request(message, use_rag=use_rag)
+    def chat_wrapper(self, message, history, use_rag, max_attempts):
+        # Converti la history di Gradio nel formato previsto dall'Orchestrator se necessario
+        # Gradio history è [[user, bot], ...]
+        formatted_history = []
+        for user_msg, bot_msg in history:
+            formatted_history.append({"role": "user", "content": user_msg})
+            formatted_history.append({"role": "assistant", "content": bot_msg})
 
-        source_text = ""
-        if sources:
-            source_text = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in sources])
+        try:
+            response, sources, logs = self.orchestrator.process_request(
+                message,
+                use_rag=use_rag,
+                chat_history=formatted_history,
+                max_attempts=int(max_attempts)
+            )
 
-        return response + source_text
+            source_text = ""
+            if sources:
+                source_text = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in set(sources)])
+
+            log_text = ""
+            if logs:
+                log_text = "\n\n<details><summary>Pensieri dell'Agente (Logs)</summary>\n\n" + "\n".join([f"- {l}" for l in logs]) + "\n</details>"
+
+            return response + source_text + log_text
+        except Exception as e:
+            return f"❌ Errore durante l'elaborazione: {str(e)}"
 
 def launch_ui():
     lora = os.environ.get("LORA_PATH")
     gguf = os.environ.get("GGUF_MODEL_PATH")
 
     agent = C64CodingAgent(lora_path=lora, gguf_path=gguf)
-    pm = PromptManager()
+    pm = agent.pm
 
-    prompt_library = pm.get_prompt("ui.prompt_library")
+    prompt_library = pm.get_config("ui.prompt_library")
     if not isinstance(prompt_library, list):
         prompt_library = [
             "Come posso cambiare il colore del bordo?",
@@ -78,7 +97,14 @@ def launch_ui():
                 chat_interface = gr.ChatInterface(
                     agent.chat_wrapper,
                     additional_inputs=[
-                        gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True)
+                        gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True),
+                        gr.Slider(
+                            minimum=1,
+                            maximum=5,
+                            value=pm.get_config("agent.max_attempts", 3),
+                            step=1,
+                            label="Tentativi Self-Healing"
+                        )
                     ]
                 )
             with gr.Column(scale=1):

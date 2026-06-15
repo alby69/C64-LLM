@@ -1,29 +1,46 @@
-# Piano di Miglioramento: C64 Coding Agent
+# Piano di Miglioramento: Specializzazione e Disaccoppiamento Agenti
 
-Dopo un'analisi approfondita del codice e della documentazione, ecco il piano di miglioramento strutturato per rendere il progetto più manutenibile, efficiente (anche su PC consumer) ed estendibile.
+Per rendere il sistema più robusto e scalabile, proponiamo un'evoluzione verso un'architettura a "Capacità" (Capabilities) invece che a "Script".
 
-## 1. Architettura e Pulizia (KISS & DRY)
+## 1. Disaccoppiamento (Architecture)
 
-*   **Consolidamento UI (`agent/agent_pro.py`)**: Attualmente la UI contiene logica duplicata e inizializzazione manuale degli agenti. Sposteremo tutta la logica di coordinamento nell'`OrchestratorAgent` e useremo la UI solo come interfaccia.
-*   **Backend Unificato**: Migliorare `ModelBackend` per gestire in modo trasparente sia i modelli carichi via `transformers` (con quantizzazione 4-bit) sia quelli via `llama.cpp` (GGUF) per chi non ha GPU.
-*   **Gestione Errori Robusta**: Migliorare il `PromptManager` per gestire la mancanza dei file di configurazione senza crashare, fornendo default sensati.
+### 1.1 Messaggistica Standardizzata
+Gli agenti non si passeranno più stringhe arbitrarie, ma oggetti `AgentMessage` che contengono:
+- `sender`: Chi ha generato il messaggio.
+- `payload`: Il contenuto (codice, log, contesto).
+- `metadata`: Token usati, tempo, flag di validazione.
 
-## 2. Potenziamento del Knowledge Engine (RAG+)
+### 1.2 Estrazione Utility (Utility-First)
+Attualmente l'Orchestratore e il Validator gestiscono troppa logica C64. Sposteremo:
+- **Memory Logic**: In un `MemoryAdvisor`.
+- **Validation Logic**: In un `ValidationRegistry` che gestisce linter indipendenti.
+- **Cycle Counting**: Già in `CycleCounter`.
 
-*   **Obsidian Integration**: Implementare pienamente il parsing dei Wiki-links `[[Nota]]` per permettere al `ResearcherAgent` di esplorare i documenti correlati.
-*   **Graph Retrieval**: Sfruttare le relazioni tra i documenti per fornire al Coder un contesto più ricco e strutturato (es. se cerchi "Sprite", carica anche "VIC-II Registers").
+## 2. Specializzazione (Agent Roles)
 
-## 3. Intelligenza e Validazione
+### 2.1 CoderAgent "Expert Profiles"
+Il Coder diventerà un guscio che carica "Profili" (System Prompts + Few-shot) dinamicamente:
+- `BASIC_V2_PROFILE`: Focus su memoria e numeri di riga.
+- `ASM_6502_PROFILE`: Focus su cicli macchina e registri VIC/SID.
+- `MATH_ROUTINES_PROFILE`: Focus su algoritmi a 8-bit.
 
-*   **Memory Map Tracker**: Introdurre un sistema di tracciamento della memoria C64 nell'Orchestratore per evitare conflitti (es. non usare la stessa area di memoria per codice e dati se non richiesto).
-*   **Validatore BASIC Avanzato**: Migliorare `ValidatorAgent` per rilevare errori comuni del BASIC v2 (es. variabili troppo lunghe, oltre i 2 caratteri significativi).
-*   **Self-Healing Migliorato**: Permettere più round di correzione automatica se l'errore persiste.
+### 2.2 ValidatorAgent "Plugin-based"
+Invece di un unico grande metodo `validate`, useremo un sistema a plugin:
+- `ACMEValidator`
+- `BasicSyntaxLinter`
+- `BasicVariableCollisionLinter`
+- `AssemblyBranchLinter`
+- `MemoryCollisionLinter`
 
-## 4. Usabilità su Hardware "Normali"
+### 2.3 ResearcherAgent "Context Orchestrator"
+Il Researcher gestirà diversi canali di informazione:
+- `VectorSearchChannel` (FAISS)
+- `WikiGraphChannel` (Obsidian links)
+- `SymbolTableChannel` (Registri C64 predefiniti)
 
-*   **Ottimizzazione GGUF**: Finalizzare l'integrazione di `LlamaCppBackend`. Un modello da 1.5B in formato Q4_K_M occupa meno di 1GB di RAM e gira velocemente su qualsiasi CPU moderna.
-*   **Docker Ready**: Ottimizzare il `Dockerfile` per build multi-stage, riducendo la dimensione dell'immagine finale.
+## 3. Implementazione (Step-by-Step)
 
----
-
-*Questo piano mira a trasformare un prototipo funzionale in uno strumento di sviluppo solido e accessibile per tutti gli appassionati di retrocomputing.*
+1.  **Creazione `MemoryAdvisor`**: Disaccoppiare la gestione della memoria dall'Orchestratore.
+2.  **Refactoring `ValidatorAgent`**: Implementare il sistema a plugin.
+3.  **Refactoring `CoderAgent`**: Implementare il sistema a profili dinamici.
+4.  **Integrazione `AgentMessage`**: Standardizzare la comunicazione.

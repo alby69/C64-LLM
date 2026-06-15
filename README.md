@@ -1,33 +1,28 @@
 # C64 Multi-Agent Coding Assistant
 
-Questo progetto è un assistente alla programmazione specializzato per il **Commodore 64**, capace di generare codice **Assembly 6502** e **BASIC v2**. Utilizza un'architettura multi-agente avanzata e un sistema RAG (Retrieval-Augmented Generation) per garantire precisione tecnica e ridurre le allucinazioni.
+Questo progetto è un assistente alla programmazione specializzato per il **Commodore 64**, capace di generare codice **Assembly 6502** e **BASIC v2**. Utilizza un'architettura multi-agente avanzata e un sistema RAG (Retrieval-Augmented Generation).
 
 ## 🚀 Caratteristiche Principali
 
-- **Architettura Multi-Agente**:
-    - **ResearcherAgent**: Espande le query dell'utente e recupera informazioni tecniche dal Knowledge Base.
-    - **CoderAgent**: Genera codice con 'personalità' specifiche (BASIC/Assembly) e ragionamento strutturato.
-    - **ValidatorAgent**: Verifica il codice tramite l'assembler ACME e un parser BASIC v2 dedicato.
-    - **OrchestratorAgent**: Coordina il flusso e gestisce il self-healing.
-- **C64 Knowledge Engine**: Un sistema RAG avanzato che integra un **Vault Obsidian**, supporta Wiki-links per la navigazione del grafo di conoscenza e parsing dei metadati (frontmatter).
-- **Prompt Management System (PMS)**: Centralizza tutti i prompt in file YAML gestiti via `PromptManager` per un disaccoppiamento totale tra logica e istruzioni.
-- **Ottimizzazione Locale (CPU Only)**: Supporto per modelli **GGUF** tramite `llama.cpp`, ideale per girare su macchine con 16GB RAM senza GPU.
+- **Architettura Multi-Agente**: Researcher, Coder, Validator, e Orchestrator lavorano insieme con meccanismo di **Self-Healing**.
+- **C64 Knowledge Engine**: Sistema RAG avanzato con supporto **HyDE** e Wiki-links Obsidian.
+- **Performance Aware**: Include un **Cycle Counter** per Assembly e validazione sintattica rigorosa per BASIC v2.
+- **Configurabile & Estensibile**: Gestione tramite `agent_config.yaml` e Prompt Management System (PMS).
 
 ## 📂 Struttura del Progetto
 
 - `agent/`: Logica degli agenti e del sistema RAG.
-- `docs/`: Documentazione approfondita sull'architettura e sul design degli agenti.
-- `pipeline/`: Script per la preparazione del dataset (PDF to Text, Cleaning).
-- `utils/`: Strumenti di validazione e interazione con l'emulatore.
-- `knowledge_base/`: Documentazione tecnica in formato Markdown.
-- `data/`: Memoria vettoriale e output della pipeline.
+- `docs/`: Documentazione tecnica consolidata.
+- `pipeline/`: Script per la preparazione del dataset e crawling proattivo.
+- `utils/`: Strumenti di validazione, cycle counting e utility.
+- `config/`: Configurazioni di sistema e sorgenti.
+- `prompts/`: Repository centrale dei prompt.
 
 ## 🛠️ Installazione e Utilizzo
 
 ### Requisiti
 - Python 3.10+
 - [ACME Assembler](https://github.com/meonwax/acme) (per la validazione del codice)
-- [VICE Emulator](http://vice-emu.sourceforge.net/) (opzionale, per testare i file .prg)
 
 ### Setup
 ```bash
@@ -40,12 +35,7 @@ python -m agent.agent_pro
 ```
 
 ## 📖 Documentazione
-Per maggiori dettagli, consulta la cartella `docs/`:
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md): Panoramica del sistema.
-- [REFACTORING.md](docs/REFACTORING.md): Dettagli sulla transizione al sistema multi-agente.
-- [RESEARCHER_DEEP_DIVE.md](docs/RESEARCHER_DEEP_DIVE.md): Funzionamento del Researcher.
-- [CODER_DEEP_DIVE.md](docs/CODER_DEEP_DIVE.md): Strategie di generazione del Coder.
-- [IMPLEMENTATION_PLAN_AGENTS.md](docs/IMPLEMENTATION_PLAN_AGENTS.md): Piano dettagliato per le evoluzioni future degli agenti.
+- [TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md): **Manuale Tecnico Completo.** Architettura, agenti, RAG e roadmap.
 
 ---
 *Progetto sviluppato per preservare e potenziare l'arte della programmazione su sistemi 8-bit.*

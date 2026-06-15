@@ -46,7 +46,22 @@ class ResearcherAgent:
         lang = self.backend.generate(prompt, max_new_tokens=10, temperature=0.1).strip().lower()
         return lang
 
-    def research(self, query, chat_history=None):
+    def generate_hyde_answer(self, query):
+        """Genera una risposta ipotetica (HyDE) per migliorare il recupero."""
+        if not self.backend:
+            return query
+
+        system_prompt = "Sei un esperto di Commodore 64. Genera un paragrafo tecnico ipotetico che descriva la soluzione o i registri necessari per la seguente richiesta. Non preoccuparti della precisione assoluta, focalizzati sui termini tecnici."
+        prompt = (
+            f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+            f"<|im_start|>user\n{query}<|im_end|>\n"
+            f"<|im_start|>assistant\n"
+        )
+        hyde_answer = self.backend.generate(prompt, max_new_tokens=150, temperature=0.3).strip()
+        print(f"[Researcher] HyDE Answer generata.")
+        return hyde_answer
+
+    def research(self, query, chat_history=None, use_hyde=True):
         """Interroga il Knowledge Base per ottenere contesto pertinente."""
         # 1. Espansione della query (con supporto multi-turn)
         expanded_query = self.expand_query(query, chat_history=chat_history)
@@ -55,8 +70,13 @@ class ResearcherAgent:
         lang = self.detect_language(query)
         print(f"[Researcher] Linguaggio rilevato: {lang}")
 
-        # 3. Ricerca vettoriale
-        docs = self.kb.query(expanded_query)
+        # 3. HyDE (opzionale)
+        search_query = expanded_query
+        if use_hyde:
+            search_query = self.generate_hyde_answer(expanded_query)
+
+        # 4. Ricerca vettoriale
+        docs = self.kb.query(search_query)
         if not docs:
             # Se la query espansa fallisce, prova con l'originale
             docs = self.kb.query(query)
