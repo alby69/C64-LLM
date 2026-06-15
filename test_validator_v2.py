@@ -52,6 +52,40 @@ def test_variable_collisions():
     print(f"BASIC No Collision Success: {success}, Log: {log}")
     assert success
 
+def test_variable_collisions():
+    v = ValidatorAgent()
+
+    # Test BASIC variable collision
+    code_collision = """
+    10 SCORE1 = 100
+    20 SCORE2 = 200
+    30 PRINT SCORE1 + SCORE2
+    """
+    success, log = v.validate_basic(code_collision)
+    print(f"BASIC Collision Success: {success}, Log: {log}")
+    assert not success
+    #all_variables[short_name] is 'SCORE1' when checking 'SCORE2'
+    assert "Potenziale collisione di variabili 'SCORE2' e 'SCORE1'" in log
+
+    code_no_collision = """
+    10 SC = 100
+    20 PO = 200
+    30 PRINT SC + PO
+    """
+    success, log = v.validate_basic(code_no_collision)
+    print(f"BASIC No Collision Success: {success}, Log: {log}")
+    assert success
+
+    # Test string and integer suffixes
+    code_suffixes = """
+    10 A = 1
+    20 A$ = "HELLO"
+    30 A% = 2
+    """
+    success, log = v.validate_basic(code_suffixes)
+    print(f"BASIC Suffixes Success: {success}, Log: {log}")
+    assert success
+
 if __name__ == "__main__":
     try:
         test_logical_flow_and_basic_ranges()
