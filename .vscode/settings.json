@@ -1,0 +1,6 @@
+{
+  "window.zoomLevel": 1,
+  "terminal.integrated.fontSize": 20,
+"terminal.integrated.fontFamily": "Fira Code",
+  "editor.fontSize": 16
+}
