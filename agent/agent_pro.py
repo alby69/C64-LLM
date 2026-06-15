@@ -703,13 +703,13 @@ def launch_ui():
                     gr.Markdown("### Esplora file KB")
                     list_btn = gr.Button("Elenca tutti i file", size="sm")
                     file_dropdown = gr.Dropdown(
-                        choices=lambda: all_kb_file_choices(),
+                        choices=all_kb_file_choices(),
                         label="Anteprima file",
-                        allow_custom_value=True,
                     )
                     preview_btn = gr.Button("Visualizza", size="sm")
 
             list_btn.click(fn=list_kb_files, outputs=info_log)
+
             preview_btn.click(fn=preview_kb_file, inputs=file_dropdown, outputs=info_log)
 
     demo.launch(server_name="0.0.0.0", theme=gr.themes.Soft())
