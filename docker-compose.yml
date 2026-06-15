@@ -1,30 +1,37 @@
 services:
+  c64-ui:
+    build: .
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GGUF_MODEL_PATH=/app/data/models/qwen2.5-coder-1.5b.Q4_K_M.gguf
+    command: python agent/agent_pro.py
+
   c64-pipeline:
     build: .
     volumes:
-      - ./data:/data
+      - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      - INPUT_TYPE=${INPUT_TYPE:-asm}
-    command: >
-      sh -c "INPUT_TYPE_CMD=\"$$INPUT_TYPE\";
-             if [ \"$$INPUT_TYPE_CMD\" = \"pdf\" ] || [ \"$$INPUT_TYPE_CMD\" = \"all\" ]; then
-               if ls /data/input/*.pdf 1> /dev/null 2>&1; then
-                 python pdf2text.py /data/input/$(ls /data/input/ | head -1) /data/output/raw.txt;
-                 python text_cleaner.py /data/output/raw.txt /data/output/clean.txt;
-               fi;
-             fi;
-             python build_dataset.py $$INPUT_TYPE_CMD /data /data/output/dataset.jsonl"
+      - INPUT_PDF=/app/data/input/${INPUT_PDF:-manuale.pdf}
+      - RAW_TEXT=/app/data/output/raw.txt
+      - CLEAN_TEXT=/app/data/output/clean.txt
+      - DATASET_JSONL=/app/data/output/dataset_unified.jsonl
+    command: python run_pipeline.py
 
   c64-train:
     build: .
     volumes:
-      - ./data:/data
+      - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      - CUDA_VISIBLE_DEVICES=""
+      - MODEL_NAME=Qwen/Qwen2.5-Coder-1.5B-Instruct
+      - OUTPUT_DIR=/app/data/models/c64-lora-pro
     deploy:
       resources:
         limits:
           memory: 16G
-    command: python train_lora.py /data/output/dataset.jsonl
+    command: python pipeline/train_lora.py /app/data/output/dataset_unified.jsonl

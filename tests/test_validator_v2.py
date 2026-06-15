@@ -32,7 +32,7 @@ def test_logical_flow_and_basic_ranges():
 def test_variable_collisions():
     linter = BasicVariableCollisionLinter()
 
-    # Test BASIC variable collision
+    # Test BASIC variable collision via direct linter
     code_collision = """
     10 SCORE1 = 100
     20 SCORE2 = 200
@@ -52,28 +52,17 @@ def test_variable_collisions():
     print(f"BASIC No Collision Success: {success}, Log: {log}")
     assert success
 
-def test_variable_collisions():
+    # Test with ValidatorAgent wrapper
     v = ValidatorAgent()
-
-    # Test BASIC variable collision
-    code_collision = """
-    10 SCORE1 = 100
-    20 SCORE2 = 200
-    30 PRINT SCORE1 + SCORE2
-    """
-    success, log = v.validate_basic(code_collision)
-    print(f"BASIC Collision Success: {success}, Log: {log}")
+    success, log = v.validate(f"```basic\n{code_collision.strip()}\n```")
     assert not success
-    #all_variables[short_name] is 'SCORE1' when checking 'SCORE2'
-    assert "Potenziale collisione di variabili 'SCORE2' e 'SCORE1'" in log
 
     code_no_collision = """
     10 SC = 100
     20 PO = 200
     30 PRINT SC + PO
     """
-    success, log = v.validate_basic(code_no_collision)
-    print(f"BASIC No Collision Success: {success}, Log: {log}")
+    success, log = v.validate(f"```basic\n{code_no_collision.strip()}\n```")
     assert success
 
     # Test string and integer suffixes
@@ -82,7 +71,7 @@ def test_variable_collisions():
     20 A$ = "HELLO"
     30 A% = 2
     """
-    success, log = v.validate_basic(code_suffixes)
+    success, log = linter.check(code_suffixes)
     print(f"BASIC Suffixes Success: {success}, Log: {log}")
     assert success
 

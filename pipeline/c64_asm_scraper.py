@@ -19,9 +19,12 @@ import time
 import argparse
 import hashlib
 import logging
+import urllib3
 from pathlib import Path
 from urllib.parse import urljoin, urlparse, unquote
 from typing import Optional
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 try:
     import requests
@@ -247,13 +250,17 @@ def looks_like_asm(content: str) -> bool:
 
 
 def get_page(url: str, timeout: int = 15) -> Optional[requests.Response]:
-    try:
-        r = SESSION.get(url, timeout=timeout, allow_redirects=True)
-        r.raise_for_status()
-        return r
-    except Exception as exc:
-        log.warning(f"  ✗ Impossibile scaricare {url}: {exc}")
-        return None
+    for attempt, verify in enumerate([True, False]):
+        try:
+            r = SESSION.get(url, timeout=timeout, allow_redirects=True, verify=verify)
+            r.raise_for_status()
+            return r
+        except Exception as exc:
+            if attempt == 1 or "SSL" not in str(exc):
+                log.warning(f"  ✗ Impossibile scaricare {url}: {exc}")
+                return None
+            log.info(f"  ↻ Riprovo senza verifica SSL: {url}")
+    return None
 
 
 # ─── Salvataggio file ─────────────────────────────────────────────────────────
@@ -280,8 +287,6 @@ class Downloader:
                                 self._seen_hashes.add(h)
                             except Exception:
                                 pass
-
-PDF_EXTENSIONS = {".pdf"}
 
     def save(self, site_name: str, filename: str, content: bytes, is_pdf: bool = False) -> bool:
         """Salva un file nella sottocartella del sito; evita duplicati."""

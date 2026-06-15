@@ -1,0 +1,43 @@
+# Core ML
+torch>=2.0.0
+transformers>=4.37.0
+accelerate>=0.27.0
+sentencepiece>=0.1.99
+
+# Quantization
+bitsandbytes>=0.41.0
+
+# LoRA Fine-tuning
+peft>=0.7.0
+trl>=0.7.0
+datasets>=2.14.0
+
+# RAG / Vector Store
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+langchain-core>=0.1.0
+langchain-community>=0.0.10
+langchain-text-splitters>=0.0.1
+python-frontmatter>=1.0.0
+
+# LLM Backend (CPU)
+llama-cpp-python>=0.2.0
+
+# Web Scraping
+requests>=2.28.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+internetarchive>=3.0.0
+
+# PDF Extraction
+PyMuPDF>=1.23.0
+
+# UI
+gradio>=4.0.0
+
+# Config & Templating
+PyYAML>=6.0
+jinja2>=3.1.0
+
+# Data
+numpy>=1.24.0

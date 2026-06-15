@@ -50,6 +50,17 @@ class C64KnowledgeBase:
             loader_txt = TextLoader(clean_txt)
             documents.extend(loader_txt.load())
 
+        # BASIC extracted from D64
+        input_dir = "data/input"
+        if os.path.exists(input_dir):
+            for root, _, files in os.walk(input_dir):
+                for fname in files:
+                    if fname.endswith(".bas.txt"):
+                        path = os.path.join(root, fname)
+                        with open(path, 'r') as f:
+                            content = f.read()
+                        documents.append(Document(page_content=content, metadata={"source": path}))
+
         text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         docs = text_splitter.split_documents(documents)
 
