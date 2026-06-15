@@ -35,8 +35,8 @@
            │  knowledge_base │  │  build_dataset       │    │ knowledge_base/     │
            │  .py            │  │  (QA pairs)          │    │ (file .md con       │
            │  carica .bas.txt│  └────────┬─────────────┘    │  frontmatter)       │
-           │  .ml.txt .md    │           │                  └──────────┬──────────┘
-           │  e clean.txt    │           ▼                            │
+           │  .ml.txt .md    │           │                  │  + tutorial BASIC   │
+           │  e clean.txt    │           ▼                  └──────────┬──────────┘
            └────────┬────────┘  ┌──────────────────────┐              │
                     │           │ dataset_unified      │              │
                     │           │  .jsonl              │              │
@@ -48,13 +48,13 @@
            │                    INDICE VETTORIALE FAISS                            │
            │                    data/vectorstore/                                  │
            └──────────────────────────────────┬───────────────────────────────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────────────┐
-                                    │  RAG in chat              │
-                                    │  (cerca documenti)        │
-                                    │  + risposta con LLM       │
-                                    └──────────────────────────┘
+                                               │
+                                               ▼
+                                     ┌──────────────────────────┐
+                                     │  RAG in chat              │
+                                     │  (prompt + contesto KB)   │
+                                     │  → risposta LLM           │
+                                     └──────────────────────────┘
 ```
 
 ## Legenda
@@ -64,6 +64,7 @@
 | **extract_d64.py** | Legge un D64, elenca directory, estrae PRG, detokenizza BASIC v2 | `data/input/<item_id>/<nome>.bas.txt` |
 | **extract_g64.py** | Legge un G64, decodifica GCR, ricostruisce directory, estrae PRG | `data/input/<item_id>/<nome>.bas.txt`, `*.ml.txt` |
 | **extract_prg.py** | Legge un PRG, tenta detokenize BASIC, produce hex dump per ML | `data/input/<nome>.bas.txt`, `*.ml.txt` |
+| **basic_tokens.py** | Modulo condiviso: tabella token BASIC v2 + detokenize + hex_dump + is_basic_prg | (libreria) |
 | **scrape_docs.py** | Scansiona un sito, scarica PDF (segue link, evita duplicati) | `data/input/<sito>/` |
 | **c64_asm_scraper.py** | Scraping mirato su siti noti (codebase64, 6502.org, etc.) | `data/src/<sito>/` |
 | **scrape_url.py** | Scrapa un URL singolo per codice assembly | `data/src/web/` |
@@ -71,7 +72,8 @@
 | **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
 | **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
 | **knowledge_base.py** | Costruisce indice FAISS da `.md` + `clean.txt` + `.bas.txt` + `.ml.txt` | `data/vectorstore/` |
-| **basic_tokens.py** | Modulo condiviso: tabella token BASIC v2 + funzioni detokenize/hex_dump | (libreria) |
+| **prompts/prompts.yaml** | Template prompt per researcher, coder, orchestrator, crawler | (config) |
+| **config/agent_config.yaml** | Config agente: tentativi, temperatura, RAG parametri | (config) |
 
 ## Flussi tipici
 
@@ -114,9 +116,18 @@ PDF in data/input/ → docker compose run c64-pipeline
 | Tab | Funzioni |
 |-----|----------|
 | **Chat** | Interfaccia conversazionale con RAG toggle, Prompt Library, self-healing slider |
-| **Scarica** | URL input + Avvia / Pausa (SIGSTOP) / Riprendi (SIGCONT) / Annulla |
+| **Scarica** | URL input + Avvia / Pausa (SIGSTOP) / Riprendi (SIGCONT) / Annulla. Supporta PDF, D64, G64, PRG, Archive.org |
 | **Siti** | CheckboxGroup siti predefiniti (7) + personalizzati (da `data/custom_sites.json`); form per aggiungere nuovi siti |
-| **Dati** | Ricostruisci KB / Visualizza Dataset / Statistiche (conteggi file, entries) |
+| **Dati** | Ricostruisci KB, Visualizza Dataset, Statistiche, **Esplora file KB** (elenco file con dimensioni + anteprima) |
+
+### Tab Dati — Esplora file KB
+
+Pulsante **Elenca tutti i file**: mostra ricorsivamente tutti i file in:
+- `knowledge_base/` — file `.md` con frontmatter (tutorial, documentazione)
+- `data/input/` — file estratti `.bas.txt`, `.ml.txt`, `.pdf`
+- `data/src/` — file scraper `.asm`
+
+Dropdown **Anteprima file** + **Visualizza**: mostra le prime 50 righe del file selezionato.
 
 ## Controllo processo
 
@@ -124,6 +135,19 @@ PDF in data/input/ → docker compose run c64-pipeline
 - **Pausa**: `threading.Event` + `SIGSTOP` sul subprocess
 - **Riprendi**: `SIGCONT` sul subprocess + evento settato
 - **Annulla**: `killpg()` sul gruppo processo
+
+## System Prompt (prompts/prompts.yaml)
+
+Il prompt di sistema per il coder (`coder.base.system`) è stato rafforzato per prevenire allucinazioni:
+- Elenca esplicitamente i comandi BASIC V2 validi (PRINT, INPUT, POKE, GOTO, etc.)
+- Vieta comandi inesistenti (MOV, ADD, SUB, CINV, ORG, DB, etc.)
+- Istruisce il modello a usare ESCLUSIVAMENTE il contesto RAG fornito
+- Include anche sintassi di riferimento per Assembly 6502 (ACME)
+
+## Bug fix: backend model GGUF
+
+- `researcher.py` / `coder.py`: usano `hasattr(model, 'generate')` (duck typing) invece di `isinstance(model, ModelBackend)`.
+- Con GGUF il backend è `LlamaCppBackend` (ha `generate()` ma non è `ModelBackend`), quindi veniva wrappato in `ModelBackend(model, tokenizer=None)` causando `'NoneType' object is not callable`.
 
 ## Note
 
