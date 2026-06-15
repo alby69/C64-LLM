@@ -3,7 +3,7 @@ import yaml
 from jinja2 import Template
 
 class PromptManager:
-    def __init__(self, prompts_file="prompts/prompts.yaml"):
+    def __init__(self, prompts_file="prompts/prompts.yaml", config_file="config/agent_config.yaml"):
         # Cerca il file prompts.yaml in diverse posizioni possibili
         search_paths = [
             prompts_file,
@@ -20,6 +20,31 @@ class PromptManager:
 
         if not self.prompts:
             print(f"Warning: Prompts file not found in any of {search_paths}. Using empty dict.")
+
+        # Carica configurazione unificata
+        self.config = {}
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    self.config = yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"Error loading config from {config_file}: {e}")
+
+    def get_config(self, path, default=None):
+        """Ottiene un valore dalla configurazione dato un path (es. 'agent.max_attempts')."""
+        keys = path.split('.')
+        value = self.config
+        try:
+            for key in keys:
+                if isinstance(value, dict):
+                    value = value.get(key)
+                else:
+                    value = None
+                    break
+        except (KeyError, TypeError):
+            value = None
+
+        return value if value is not None else default
 
     def _load_prompts(self, path):
         try:
