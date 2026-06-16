@@ -753,21 +753,26 @@ def preview_kb_file(rel_path):
     if not rel_path:
         return "Seleziona un file."
     full_path = None
-    for directory, _ in KB_DIRS:
-        candidate = os.path.join(directory, rel_path)
-        if os.path.exists(candidate):
-            full_path = candidate
-            break
+    if os.path.exists(rel_path):
+        full_path = rel_path
+    else:
+        for directory, _ in KB_DIRS:
+            candidate = os.path.join(directory, rel_path)
+            if os.path.exists(candidate):
+                full_path = candidate
+                break
     if not full_path:
         return f"File non trovato: {rel_path}"
     try:
-        with open(full_path, "r") as f:
+        with open(full_path, "r", errors="replace") as f:
             content = f.read()
         sz = os.path.getsize(full_path)
         lines = content.split("\n")
         preview = "\n".join(lines[:50])
         extra = f"\n\n... ({len(lines) - 50} righe in piu', {sz} byte totali)" if len(lines) > 50 else ""
         return f"--- {rel_path} ({sz} byte) ---\n\n{preview}{extra}"
+    except UnicodeDecodeError:
+        return f"File binario (non visualizzabile come testo): {rel_path}"
     except Exception as e:
         return f"Errore lettura: {e}"
 
