@@ -115,7 +115,7 @@ I file binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati auto
 
 - **Elenca tutti i file**: mostra ricorsivamente tutti i file in `knowledge_base/`, `data/input/`, `data/src/` con dimensione
 - **Cerca file**: filtro case-insensitive per nome file o percorso
-- **Anteprima file**: dropdown per selezionare un file, clicca "Visualizza" per mostrare le prime 50 righe
+- **Anteprima file**: dropdown per selezionare un file, clicca "Visualizza" per mostrare le prime 50 righe. I file binari (PDF, D64, PNG, ecc.) mostrano un messaggio "File binario" invece di crashare.
 
 ---
 

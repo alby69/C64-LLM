@@ -103,6 +103,12 @@ Lo splitter utilizza `RecursiveCharacterTextSplitter` con:
 
 Tutte le letture file nella Knowledge Base usano `encoding="utf-8", errors="replace"` per gestire file binari o corrotti. I formati binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati tramite `SKIP_EXTS`.
 
+### 3.1.3 Anteprima File
+
+La funzione `preview_kb_file()` in `agent/agent_pro.py` gestisce l'anteprima dei file nel dropdown Esplora File:
+- Il percorso selezionato viene prima verificato così com'è (relativo alla CWD), poi come join con ciascuna directory in `KB_DIRS`
+- I file binari vengono intercettati con `UnicodeDecodeError` e mostrano un messaggio esplicito invece di crashare
+
 ## 3.2 Technical Terms — Nuvola di Tag
 
 Il tab **Chat** include una sezione "Technical Terms" che mostra una nuvola di tag dei principali termini tecnici C64:
