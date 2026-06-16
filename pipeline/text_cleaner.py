@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 
 def advanced_clean(text):
-    # Remove non-ascii but keep common symbols
-    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
+    # Remove control chars but keep accented letters and symbols
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
 
     # Remove standalone page numbers (e.g., "  123  " at start/end of lines)
     text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)

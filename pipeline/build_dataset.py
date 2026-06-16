@@ -154,7 +154,7 @@ def main():
     src_files = glob.glob(f"{data_dir}/src/**/*.*", recursive=True)
     for f_path in src_files:
         try:
-            with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(f_path, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read()
                 blocks = gen.detect_blocks(content)
                 all_asm_blocks.extend(blocks["asm"])

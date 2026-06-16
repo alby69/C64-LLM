@@ -97,6 +97,20 @@ Lo splitter usa `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=1
 
 I file binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati automaticamente tramite `SKIP_EXTS`.
 
+### Documenti KB (Manuali)
+
+| File | Argomento |
+|------|-----------|
+| `c64_memory_map.md` | Mappa memoria C64 (ROM, RAM, I/O) |
+| `c64_basic_tutorial.md` | Tutorial BASIC v2 per programmatori ASM |
+| `c64_screen_routines.md` | Routine schermo: clear, scroll, charset |
+| `vic2_registers.md` | Registri VIC-II ($D000-$D03F) completi |
+| `raster_interrupts.md` | Raster interrupt: setup, split, multi-line |
+| `sprite_programming.md` | Sprite: pointer, posizione, multicolor, collisioni |
+| `sid_programming.md` | SID: voci, ADSR, forme d'onda, filtro, frequenze |
+| `kernal_routines.md` | KERNAL: screen I/O, LOAD/SAVE, vettori |
+| `6502_addressing_modes.md` | 13 modalità di indirizzamento 6502 con esempi C64 |
+
 ### Esplora file KB
 
 - **Elenca tutti i file**: mostra ricorsivamente tutti i file in `knowledge_base/`, `data/input/`, `data/src/` con dimensione

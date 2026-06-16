@@ -857,22 +857,22 @@ def _fmt_dataset_html(lines, page, query=""):
         output = entry.get("output", "")
         num = page * PAGE_SIZE + i + 1
         tags = " ".join(
-            f'<span style="display:inline-block;background:#334;padding:1px 8px;border-radius:4px;margin:2px;font-size:0.85em;color:#ddd">{_html.escape(c)}</span>'
+            f'<span style="display:inline-block;background:#334;padding:1px 8px;border-radius:4px;margin:2px;font-size:0.85em;color:#eee">{_html.escape(c)}</span>'
             for c in constraints
         ) if constraints else ""
         card = (
             f'<div style="border:1px solid #555;border-radius:8px;padding:12px;margin:0 6px;'
-            f'min-width:360px;max-width:420px;background:#1a1a2e;color:#e0e0e0;flex-shrink:0;font-family:sans-serif">'
+            f'min-width:360px;max-width:420px;background:#1e1e30;color:#f0f0f0;flex-shrink:0;font-family:sans-serif">'
             f'<div style="color:#888;font-size:0.8em;margin-bottom:4px">#{num}</div>'
-            f'<div style="margin-bottom:4px"><strong style="color:#ffd700">Istruzione:</strong><br>{_html.escape(instr)}</div>'
+            f'<div style="margin-bottom:4px"><strong style="color:#ffd700">Istruzione:</strong><br><span style="color:#ffffff">{_html.escape(instr)}</span></div>'
         )
         if ctx:
-            card += f'<div style="margin-bottom:4px"><strong style="color:#ffd700">Contesto:</strong><br>{_html.escape(ctx)}</div>'
+            card += f'<div style="margin-bottom:4px"><strong style="color:#ffd700">Contesto:</strong><br><span style="color:#ffffff">{_html.escape(ctx)}</span></div>'
         if tags:
             card += f'<div style="margin-bottom:4px"><strong style="color:#ffd700">Vincoli:</strong><br>{tags}</div>'
         card += (
             f'<pre style="background:#0d0d1a;border:1px solid #333;border-radius:4px;padding:8px;'
-            f'margin-top:6px;overflow-x:auto;white-space:pre-wrap;font-size:0.85em;color:#ccc;max-height:300px">{_html.escape(output)}</pre>'
+            f'margin-top:6px;overflow-x:auto;white-space:pre-wrap;font-size:0.85em;color:#ddd;max-height:300px">{_html.escape(output)}</pre>'
             f'</div>'
         )
         cards.append(card)

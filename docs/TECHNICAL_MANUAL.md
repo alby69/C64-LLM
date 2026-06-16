@@ -79,7 +79,7 @@ La checkbox "Auto-elabora link" nell'interfaccia Chat attiva un flusso automatic
 ## 3. Knowledge Engine (RAG)
 
 Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tecnica dell'agente.
-- **Vault Obsidian**: La documentazione è strutturata in Markdown con frontmatter YAML per tag e categorie.
+- **Vault Obsidian**: La documentazione è strutturata in Markdown (9 manuali: `vic2_registers.md`, `raster_interrupts.md`, `sprite_programming.md`, `sid_programming.md`, `kernal_routines.md`, `6502_addressing_modes.md`, `c64_screen_routines.md`, `c64_basic_tutorial.md`, `c64_memory_map.md`) con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
 - **Pipeline**: Include strumenti di pulizia per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
 
