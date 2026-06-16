@@ -43,6 +43,37 @@ Garantisce la qualità del codice:
 ### 2.5 WebCrawlerAgent (Acquisizione Conoscenza)
 Agente proattivo che monitora fonti autorevoli (C64-Wiki, GitHub, Zimmers, Archive.org) per mantenere aggiornato il Knowledge Base locale.
 
+### 2.5.1 Download Intelligente da Archive.org
+Quando viene inserito un URL di Archive.org, il sistema:
+1. **Analizza i metadati** dell'item via API (`metadata/{item_id}`)
+2. **Seleziona il miglior formato testuale** con priorità: **TXT > EPUB > HTML > PDF**
+3. **Scarica un solo file** (il migliore disponibile, non tutti i PDF)
+4. **Estrae il testo** in base al formato:
+   - `.txt`: copia diretta
+   - `.epub`: decompone ZIP, estrae testo da XHTML/HTML con `HTMLParser` stdlib (fallback `pandoc`)
+   - `.html`/`.htm`: pulisce tag HTML con `HTMLParser` stdlib
+   - `.pdf`: estrazione via pdf2text (come prima)
+5. **Pipeline**: text_cleaner → build_dataset → rebuild KB
+6. Gli eventuali file D64/G64/PRG vengono scaricati ed estratti in parallelo
+
+### 2.5.2 Download da Google Drive
+
+Quando viene inserito un URL di Google Drive (`/drive/folders/<id>`), il sistema:
+1. **Enumera i file** nella cartella con `gdown.download_folder(skip_download=True)` (nessun download effettivo)
+2. **Mostra riepilogo**: numero di file trovati, raggruppati per sottocartella
+3. **Scarica file per file** con `gdown.download(id, output, quiet=True)`
+4. **Fallback**: se gdown fallisce (rate limiting), riprova con `requests` su `https://drive.google.com/uc?id=<id>&export=download&confirm=t`, verificando che il content-type non sia `text/html`
+5. **Delay**: 1.5 secondi tra file per evitare rate limiting
+6. **Pipeline**: tutti i PDF scaricati vengono processati: pdf2text → text_cleaner → build_dataset → rebuild KB
+
+### 2.5.3 Auto-elabora Link dalla Chat
+
+La checkbox "Auto-elabora link" nell'interfaccia Chat attiva un flusso automatico:
+1. Dopo la risposta dell'agente, vengono estratti tutti gli URL dal messaggio utente e dalla risposta
+2. Ogni URL viene aggiunto a `data/custom_sites.json` (saltando duplicati)
+3. Per ogni URL, viene eseguita `download_and_integrate()` che avvia la pipeline completa
+4. Il progresso viene mostrato in tempo reale nella chat tramite yield del generatore
+
 ---
 
 ## 3. Knowledge Engine (RAG)
@@ -51,6 +82,45 @@ Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tec
 - **Vault Obsidian**: La documentazione è strutturata in Markdown con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
 - **Pipeline**: Include strumenti di pulizia per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
+
+---
+
+## 3.1 Knowledge Base — Ricerca File nella UI
+
+Il tab **Knowledge Base** include una sezione "Esplora file KB" con:
+- **Elenca tutti i file**: mostra ricorsivamente tutti i file in `knowledge_base/`, `data/input/`, `data/src/`
+- **Cerca file**: filtro case-insensitive per nome file o percorso, utile per verificare se un file è già stato inserito
+- **Anteprima file**: dropdown + pulsante per visualizzare le prime 50 righe di un file selezionato
+
+### 3.1.1 Chunking
+
+Lo splitter utilizza `RecursiveCharacterTextSplitter` con:
+- `chunk_size=1500`, `chunk_overlap=150`
+- Separatori: `["\n\n", "\n", ".", " ", ""]`
+- A differenza del vecchio `CharacterTextSplitter(chunk_size=500)`, evita warning "Created a chunk of size X which is longer than the specified 500" e gestisce meglio codice assembly/BASIC preservando la struttura lessicale.
+
+### 3.1.2 Encoding Handling
+
+Tutte le letture file nella Knowledge Base usano `encoding="utf-8", errors="replace"` per gestire file binari o corrotti. I formati binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati tramite `SKIP_EXTS`.
+
+## 3.2 Technical Terms — Nuvola di Tag
+
+Il tab **Chat** include una sezione "Technical Terms" che mostra una nuvola di tag dei principali termini tecnici C64:
+- **Dimensione del tag** = importanza (peso 1-5): registri core e istruzioni frequenti sono più grandi
+- **Colore**: sfumatura dal ciano al bianco in base all'importanza
+- **Cerca**: casella di testo per filtrare i termini in tempo reale
+- **Click**: cliccando un termine viene automaticamente inserito nel campo di input della chat
+- **Oltre 150 termini** coperti tra registri VIC-II/SID/CIA, istruzioni 6502, comandi BASIC v2, e concetti (Raster Interrupt, Sprite, ecc.)
+
+---
+
+## 3.3 Dataset Viewer
+
+Il tab **Dati** include un visualizzatore del dataset con:
+- **Paginazione**: 20 entry per pagina, navigazione con ◀/▶
+- **Ricerca**: filtro case-insensitive su tutte le entry
+- **Card orizzontali**: ogni entry JSONL formattata come card HTML con scroll orizzontale (flexbox + overflow-x:auto)
+- La struttura JSONL segue: `{"instruction", "context", "constraints", "output"}`
 
 ---
 
@@ -70,6 +140,17 @@ Il sistema è altamente configurabile tramite `config/agent_config.yaml`:
 - **agent.max_attempts**: Numero di round di self-healing.
 - **rag.use_hyde**: Abilita/disabilita la generazione ipotetica.
 - **ui.prompt_library**: Lista di prompt predefiniti nella Gradio UI.
+
+### 5.1 Backend Modello
+
+Supporta due backend configurabili in `agent/model_backend.py`:
+
+| Backend | Quando usato | Configurazione |
+|---------|-------------|----------------|
+| **LlamaCppBackend** (default) | Se `gguf_path` esiste | `n_ctx=8192`, `n_threads=os.cpu_count()`, file `.gguf` in `/app/data/models/` |
+| **ModelBackend** (HF Transformers) | Se nessun GGUF trovato | AutoModelForCausalLM con 4-bit quantization, supporta LoRA tramite PeftModel |
+
+Il contesto (`n_ctx`) è stato portato da 2048 a 8192 per gestire messaggi lunghi (es. risposte da altri LLM).
 
 ---
 

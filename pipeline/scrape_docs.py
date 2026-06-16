@@ -13,10 +13,10 @@ urllib3.disable_warnings()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("scrape_docs")
 
-import requests
+import cloudscraper
 
-SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "Mozilla/5.0 (compatible; C64DocScraper/1.0)"})
+SESSION = cloudscraper.create_scraper()
+SESSION.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
 
 PDF_EXT = ".pdf"
 TEXT_EXT = {".txt", ".html", ".htm"}

@@ -5,6 +5,12 @@ services:
       - "7860:7860"
     volumes:
       - ./data:/app/data
+      - ./agent:/app/agent
+      - ./pipeline:/app/pipeline
+      - ./utils:/app/utils
+      - ./config:/app/config
+      - ./prompts:/app/prompts
+      - ./knowledge_base:/app/knowledge_base
     environment:
       - PYTHONUNBUFFERED=1
       - GGUF_MODEL_PATH=/app/data/models/qwen2.5-coder-1.5b.Q4_K_M.gguf

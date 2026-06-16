@@ -34,7 +34,7 @@ class LlamaCppBackend:
             print(f"Initializing Llama-cpp with {model_path}")
             self.llm = Llama(
                 model_path=model_path,
-                n_ctx=2048,
+                n_ctx=8192,
                 n_threads=os.cpu_count(),
                 verbose=False
             )

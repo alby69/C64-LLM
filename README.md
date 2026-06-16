@@ -132,6 +132,8 @@ docker compose restart c64-ui
 - **Dischi D64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_d64.py /app/data/input/disk.d64 /app/data/input/`
 - **Dischi G64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_g64.py /app/data/input/disk.g64 /app/data/input/`
 - **PRG**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_prg.py /app/data/input/program.prg /app/data/input/`
+- **Archive.org (UI)**: inserisci l'URL dell'item (es. `https://archive.org/details/c64-programmer-ref`).
+  Il sistema seleziona automaticamente il miglior formato disponibile (TXT > EPUB > HTML > PDF) e scarica un solo file.
 - **Markdown manuali**: crea file `.md` in `./knowledge_base/` con frontmatter YAML:
   ```markdown
   ---

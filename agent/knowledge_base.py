@@ -2,8 +2,7 @@ import os
 import re
 import frontmatter
 from langchain_core.documents import Document
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
@@ -26,42 +25,76 @@ class C64KnowledgeBase:
         # Carica sia Markdown che i file di testo puliti dalla pipeline
         documents = []
 
+        SKIP_EXTS = {".gz", ".gzip", ".zip", ".png", ".jpg", ".gif", ".pdf", ".d64", ".g64", ".prg"}
+
         # Markdown con parsing frontmatter
         for root, _, files in os.walk(self.kb_path):
             for file in files:
-                if file.endswith(".md"):
-                    path = os.path.join(root, file)
-                    with open(path, 'r') as f:
+                if not file.endswith(".md"):
+                    continue
+                path = os.path.join(root, file)
+                try:
+                    with open(path, 'r', encoding="utf-8", errors="replace") as f:
                         post = frontmatter.load(f)
-                        # Combiniamo metadati e contenuto per l'indicizzazione
-                        content = post.content
-                        if post.metadata:
-                            tags = post.metadata.get('tags', [])
-                            if isinstance(tags, list):
-                                content += "\nTags: " + ", ".join(tags)
-                            elif isinstance(tags, str):
-                                content += "\nTags: " + tags
-
-                        documents.append(Document(page_content=content, metadata={"source": path, **post.metadata}))
+                    content = post.content
+                    if post.metadata:
+                        tags = post.metadata.get('tags', [])
+                        if isinstance(tags, list):
+                            content += "\nTags: " + ", ".join(tags)
+                        elif isinstance(tags, str):
+                            content += "\nTags: " + tags
+                    documents.append(Document(page_content=content, metadata={"source": path, **post.metadata}))
+                except Exception as e:
+                    print(f"  Skipping {path}: {e}")
 
         # Cleaned text from pipeline
         clean_txt = "data/output/clean.txt"
         if os.path.exists(clean_txt):
-            loader_txt = TextLoader(clean_txt)
-            documents.extend(loader_txt.load())
+            try:
+                with open(clean_txt, encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                documents.append(Document(page_content=content, metadata={"source": clean_txt}))
+            except Exception as e:
+                print(f"  Skipping {clean_txt}: {e}")
 
         # BASIC extracted from D64/G64 and ML dumps
         input_dir = "data/input"
         if os.path.exists(input_dir):
             for root, _, files in os.walk(input_dir):
                 for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in SKIP_EXTS:
+                        continue
                     if fname.endswith(".bas.txt") or fname.endswith(".ml.txt"):
                         path = os.path.join(root, fname)
-                        with open(path, 'r') as f:
-                            content = f.read()
-                        documents.append(Document(page_content=content, metadata={"source": path}))
+                        try:
+                            with open(path, encoding="utf-8", errors="replace") as f:
+                                content = f.read()
+                            documents.append(Document(page_content=content, metadata={"source": path}))
+                        except Exception as e:
+                            print(f"  Skipping {path}: {e}")
 
-        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        # Assembly scraped from websites
+        src_dir = "data/src"
+        if os.path.exists(src_dir):
+            for root, _, files in os.walk(src_dir):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in SKIP_EXTS:
+                        continue
+                    if fname.endswith(".asm"):
+                        path = os.path.join(root, fname)
+                        try:
+                            with open(path, encoding="utf-8", errors="replace") as f:
+                                content = f.read()
+                            documents.append(Document(page_content=content, metadata={"source": path}))
+                        except Exception as e:
+                            print(f"  Skipping {path}: {e}")
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1500, chunk_overlap=150,
+            separators=["\n\n", "\n", ".", " ", ""]
+        )
         docs = text_splitter.split_documents(documents)
 
         self.vectorstore = FAISS.from_documents(docs, self.embeddings)

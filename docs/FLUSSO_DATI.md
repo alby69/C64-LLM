@@ -72,6 +72,11 @@
 | **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
 | **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
 | **knowledge_base.py** | Costruisce indice FAISS da `.md` + `clean.txt` + `.bas.txt` + `.ml.txt` | `data/vectorstore/` |
+| **estrazione EPUB** | `_extract_epub_text()` in `agent_pro.py`: decompone ZIP EPUB, estrae testo da XHTML/HTML con `HTMLParser` stdlib; fallback a `pandoc` | `data/output/raw.txt` |
+| **estrazione HTML** | `_extract_html_text()` in `agent_pro.py`: pulisce tag HTML con `HTMLParser` stdlib, ignora script/style | `data/output/raw.txt` |
+| **Google Drive** | `download_and_integrate()` enumera file con `gdown.download_folder(skip_download=True)`, poi scarica file per file. Fallback su `requests` diretto via `uc?id=` quando gdown fallisce per rate limiting. Ritardo 1.5s tra file. | `data/input/drive_<id>/` |
+| **Auto-elabora link dalla chat** | Spunta "Auto-elabora link" nella Chat: estrae URL da messaggio e risposta, aggiunge a `custom_sites.json`, avvia `download_and_integrate()` per ogni URL | Aggiunge siti + pipeline completa |
+| **Chunking** | `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)` con separatori `["\n\n", "\n", ".", " ", ""]` | `data/vectorstore/` |
 | **prompts/prompts.yaml** | Template prompt per researcher, coder, orchestrator, crawler | (config) |
 | **config/agent_config.yaml** | Config agente: tentativi, temperatura, RAG parametri | (config) |
 
@@ -84,12 +89,17 @@ PDF diretto  (.pdf)       → download + pipeline + rebuild KB
 D64 diretto  (.d64)       → download + extract_d64.py + rebuild KB
 G64 diretto  (.g64)       → download + extract_g64.py + rebuild KB
 PRG diretto  (.prg)       → download + extract_prg.py + rebuild KB
-Archive.org  (dettaglio)   → metadata API → D64 + G64 + PRG + PDF
+Archive.org  (dettaglio)   → metadata API → D64 + G64 + PRG + BEST_TEXT
                               ├── D64 → extract_d64.py
                               ├── G64 → extract_g64.py
                               ├── PRG → extract_prg.py
-                              └── PDF (max 5) → pipeline
-                           → rebuild KB
+                              └── BEST_TEXT: seleziona il miglior formato
+                                   disponibile tra TXT > EPUB > HTML > PDF
+                                   ├── .txt → copia diretto → text_cleaner
+                                   ├── .epub → estrazione testo (stdlib) → text_cleaner
+                                   ├── .html → estrazione testo (stdlib) → text_cleaner
+                                   └── .pdf → pdf2text → text_cleaner
+                                → build_dataset → rebuild KB
 Altro URL    (sito web)    → scrape_docs.py (PDF) + scrape_url.py (ASM)
                            → + extract per ogni D64/G64/PRG trovato
                            → pipeline per ogni PDF → rebuild KB
@@ -115,10 +125,10 @@ PDF in data/input/ → docker compose run c64-pipeline
 
 | Tab | Funzioni |
 |-----|----------|
-| **Chat** | Interfaccia conversazionale con RAG toggle, Prompt Library, self-healing slider |
-| **Scarica** | URL input + Avvia / Pausa (SIGSTOP) / Riprendi (SIGCONT) / Annulla. Supporta PDF, D64, G64, PRG, Archive.org |
-| **Siti** | CheckboxGroup siti predefiniti (7) + personalizzati (da `data/custom_sites.json`); form per aggiungere nuovi siti |
-| **Dati** | Ricostruisci KB, Visualizza Dataset, Statistiche, **Esplora file KB** (elenco file con dimensioni + anteprima) |
+| **Chat** | Interfaccia conversazionale con RAG toggle, Prompt Library, self-healing slider, **Technical Terms** (nuvola di tag navigabile con ricerca, clic per inserire termine nella chat), **Auto-elabora link** (estrae URL da chat, aggiunge siti, avvia pipeline) |
+| **Scarica e Siti** | Download URL unico (PDF/D64/G64/PRG/Archive.org/Google Drive/sito web) con Pausa/Riprendi/Annulla; CheckboxGroup siti predefiniti (7) + personalizzati; form per aggiungere/rimuovere siti; Scrapa Selezionati |
+| **Knowledge Base** | Ricostruisci Indice KB, **Esplora file KB** (elenco file con dimensioni + cerca + anteprima) |
+| **Dati** | **Dataset viewer** con paginazione (◀/▶, 20 righe), ricerca case-insensitive, visualizzazione a card orizzontali con scroll; **Statistiche** |
 
 ### Tab Dati — Esplora file KB
 
@@ -126,6 +136,9 @@ Pulsante **Elenca tutti i file**: mostra ricorsivamente tutti i file in:
 - `knowledge_base/` — file `.md` con frontmatter (tutorial, documentazione)
 - `data/input/` — file estratti `.bas.txt`, `.ml.txt`, `.pdf`
 - `data/src/` — file scraper `.asm`
+
+**Cerca file** (Textbox + pulsante): filtra i file per nome (case-insensitive) per verificare
+se un file è già presente nella KB. Mostra risultati raggruppati per directory con conteggio e dimensioni.
 
 Dropdown **Anteprima file** + **Visualizza**: mostra le prime 50 righe del file selezionato.
 
@@ -157,4 +170,14 @@ Il prompt di sistema per il coder (`coder.base.system`) è stato rafforzato per 
 - `extract_prg.py` riconosce automaticamente BASIC (detokenize) vs ML (hex dump).
 - I file `.bas.txt` e `.ml.txt` vengono automaticamente inclusi nell'indice FAISS.
 - I siti personalizzati vengono persisti in `data/custom_sites.json` (sopravvive ai riavvii container).
+- Per i siti personalizzati, lo scraping esegue prima `scrape_docs.py` (cerca PDF) e poi `scrape_url.py` (cerca codice Assembly).
+- `scrape_docs.py` usa `cloudscraper` per bypassare la protezione Cloudflare su siti come ready64.org.
 - `archive.org/download/...` usa `verify=False` per evitare problemi SSL in ambiente Docker.
+- Ogni download da Archive.org è wrappato in `try/except` con `continue`: se un file singolo fallisce (es. 500 Server Error), viene loggato e si passa al successivo — non blocca l'intera operazione.
+- Archive.org seleziona automaticamente il miglior formato disponibile per la KB: TXT > EPUB > HTML > PDF. Scarica un solo file invece di tutti i PDF.
+- Google Drive: download file-per-file con `gdown.download()`, fallback su `requests` diretto se gdown fallisce (rate limiting). Delay 1.5s tra file.
+- `n_ctx` in `LlamaCppBackend` portato da 2048 a 8192 per gestire messaggi lunghi (es. risposte Claude/ChatGPT nella chat).
+- Lo splitter della KB è passato da `CharacterTextSplitter(chunk_size=500)` a `RecursiveCharacterTextSplitter(chunk_size=1500, overlap=150)` con separatori multilivello.
+- Le letture file nella KB usano `encoding="utf-8", errors="replace"` e `SKIP_EXTS` per saltare file binari (`.gz`, `.zip`, `.pdf`, `.d64`, ecc.).
+- Il dataset viewer nel tab Dati usa `gr.HTML` con card in flexbox orizzontale + scroll, paginazione 20 entry e ricerca case-insensitive.
+
