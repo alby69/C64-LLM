@@ -12,6 +12,22 @@ rag:
   chunk_size: 500
   chunk_overlap: 50
 
+teacher:
+  # Backend: opencode | openrouter | groq | ollama | huggingface
+  type: "opencode"
+  model: ""
+  api_key: "${TEACHER_API_KEY}"
+  strategy:
+    types: ["factual", "code", "explain", "bugfix", "theory"]
+    qa_per_chunk: 2
+    languages: ["it", "en"]
+    max_chunks: 100
+  quality:
+    min_output_length: 20
+    deduplicate_similarity: 0.85
+    test_assembly: true
+    test_basic: true
+
 ui:
   theme: "soft"
   show_sources: true

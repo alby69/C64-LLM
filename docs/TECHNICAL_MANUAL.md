@@ -154,13 +154,122 @@ Supporta due backend configurabili in `agent/model_backend.py`:
 | Backend | Quando usato | Configurazione |
 |---------|-------------|----------------|
 | **LlamaCppBackend** (default) | Se `gguf_path` esiste | `n_ctx=8192`, `n_threads=os.cpu_count()`, file `.gguf` in `/app/data/models/` |
-| **ModelBackend** (HF Transformers) | Se nessun GGUF trovato | AutoModelForCausalLM con 4-bit quantization, supporta LoRA tramite PeftModel |
+| **ModelBackend** (HF Transformers) | Se nessun GGUF trovato | AutoModelForCausalLM con 4-bit quantization, supporta LoRA tramite PeftModel. Caricamento dinamico: `load_lora(path)` / `unload_lora()` via UI senza riavvio. |
 
 Il contesto (`n_ctx`) è stato portato da 2048 a 8192 per gestire messaggi lunghi (es. risposte da altri LLM).
 
 ---
 
-## 6. Evoluzione e Roadmap
+## 6. Knowledge Distillation
+
+Il sistema di Knowledge Distillation è progettato per specializzare un modello Student (Qwen2.5-Coder-1.5B-Instruct) sulla programmazione C64 (Assembly 6502 e BASIC v2) usando un Teacher LLM che genera dati sintetici di training dalla Knowledge Base.
+
+### 6.1 Architettura
+
+```
+Knowledge Base (*.md) 
+       │
+       ▼
+ KnowledgeChunkLoader
+  - Carica chunk da documento KB
+  - Filtra chunk duplicati
+  - Supporta ogni chunk come contesto indipendente
+       │
+       ▼
+    Teacher LLM (5 backends)
+  - opencode → Assistente stesso (nessuna API key)
+  - groq    → Groq API (Mixtral, Llama3, ecc.)
+  - openrouter → OpenRouter (GPT-4o, Claude, ecc.)
+  - ollama  → Ollama locale
+  - huggingface → HuggingFace Inference API
+       │
+       ▼
+ DatasetGenerator
+  - 5 tipi di dato: factual, codegen, explain, bugfix, theory
+  - 2 lingue: italiano, inglese
+  - 3 livelli qualità: standard, high (autocritica), expert (revisione multi-round)
+       │
+       ▼
+ distill_dataset.jsonl
+       │
+       ▼
+  TrainLoRA (pipeline/train_lora.py)
+   - LoRA su Qwen2.5-Coder-1.5B-Instruct
+   - Validation split automatico 10%
+   - Early stopping con load_best_model_at_end
+   - Max seq length: 2048 (configurabile fino a 4096)
+        │
+        ▼
+  Caricamento dinamico in Chat (Applica LoRA)
+   - `ModelBackend.load_lora(path)` / `unload_lora()`
+   - Modalità: Base / RAG / LoRA / RAG+LoRA
+```
+
+### 6.2 Teacher Backends
+
+| Backend | API Key | Modello Default | Costo |
+|---------|---------|-----------------|-------|
+| opencode | No | big-pickle | 0 |
+| groq | Sì (gratuita) | mixtral-8x7b-32768 | Gratuito |
+| openrouter | Sì | gpt-4o | A consumo |
+| ollama | No | llama3 | 0 (locale) |
+| huggingface | Sì | mistralai/Mixtral-8x7B-Instruct-v0.1 | Gratuito/Pro |
+
+### 6.3 Dataset Types
+
+| Tipo | Descrizione | Esempio |
+|------|-------------|---------|
+| factual | Domanda/risposta basata su fatto documentato | "What is the address of VIC-II sprite 0 X coordinate?" |
+| codegen | Generazione codice da descrizione | "Write a routine to set up a raster interrupt" |
+| explain | Spiegazione di codice Assembly | "Explain what `LDA $D012` does" |
+| bugfix | Correzione di codice con bug | "Fix the sprite position code (off-by-one)" |
+| theory | Spiegazione di concetti | "Explain zero-page addressing in 6502" |
+
+### 6.4 Training LoRA
+
+Il training (pipeline/train_lora.py) usa:
+- **Modello base**: Qwen2.5-Coder-1.5B-Instruct
+- **LoRA**: r=16, alpha=32, target modules: q_proj, k_proj, v_proj, o_proj
+- **Validation**: 10% split automatico con eval every `eval_steps` (default: 10% del training set)
+- **Early stopping**: `load_best_model_at_end=True`, metrica `eval_loss`
+- **Sequenza massima**: 2048 token (configurabile in UI fino a 4096)
+- **Output**: checkpoint LoRA salvati in `data/models/c64-lora-pro/`
+
+### 6.5 Profili di Configurazione
+
+Il sistema a profili consente di salvare e ripristinare configurazioni complete di distillazione.
+
+#### Architettura
+
+- **6 profili predefiniti** hardcoded in `PREDEFINED_DISTILL_PROFILES` in `agent/agent_pro.py`
+- **Profili personalizzati** salvati in `config/distill_profiles.json` (JSON, UTF-8)
+- I profili personalizzati hanno priorità su quelli predefiniti in caso di omonimia
+- Le API key **non** vengono mai salvate nei profili per sicurezza
+- La funzione `get_all_profile_names()` restituisce la lista completa (predefiniti + personalizzati, deduplicata)
+
+#### Flusso UI
+
+1. L'utente seleziona un profilo dal dropdown `profile_dropdown`
+2. L'evento `.change()` chiama `on_distill_load_profile()` che restituisce tutti i parametri
+3. I parametri popolano automaticamente i controlli UI (backend, modello, tipi, lingue, slider, checkbox)
+4. L'utente può modificare manualmente i parametri e salvare come nuovo profilo con `on_distill_save_profile()`
+5. L'eliminazione è gestita da `on_distill_delete_profile()` (bloccata per i profili predefiniti)
+
+#### Funzioni chiave
+
+| Funzione | Ruolo |
+|----------|-------|
+| `load_user_distill_profiles()` | Carica profili personalizzati da `config/distill_profiles.json` |
+| `save_user_distill_profiles(profiles)` | Salva profili personalizzati su disco |
+| `get_distill_profile(name)` | Cerca in personalizzati, poi in predefiniti |
+| `get_all_profile_names()` | Lista nomi deduplicata (predefiniti + personalizzati) |
+| `on_distill_load_profile(name)` | Restituisce parametri del profilo per popolare la UI |
+| `on_distill_save_profile(...)` | Salva configurazione corrente come nuovo profilo |
+| `on_distill_delete_profile(name)` | Elimina profilo personalizzato (predefiniti protetti) |
+
+---
+
+## 7. Evoluzione e Roadmap
 
 Il progetto mira a diventare un ambiente di sviluppo retrocomputing completo con:
 - **Multi-step Reasoning**: Scomposizione di task complessi (es. "scrivi un intero gioco") in sotto-task gestiti sequenzialmente.

@@ -143,8 +143,59 @@ docker compose restart c64-ui
   Contenuto...
   ```
 
+## 🧠 Knowledge Distillation
+
+Il progetto include un sistema di **Teacher→Student distillation** per specializzare Qwen2.5-Coder-1.5B su C64.
+
+### Flusso
+
+```
+Teacher LLM (OpenCode / Groq / OpenRouter / Ollama)
+       │  Legge la Knowledge Base
+       │  Genera QA sintetiche (factual, code, explain, bugfix, theory)
+       ▼
+Dataset distillato (data/output/distill_dataset.jsonl)
+       │
+       ▼
+LoRA Fine-tuning → Qwen specializzato (data/models/c64-lora-pro/)
+```
+
+### Teacher predefinito: OpenCode (gratuito)
+
+Nessuna API key. L'assistente OpenCode legge la KB e genera il dataset. Sono già state generate **76 QA pairs** che coprono tutti i 10 file KB.
+
+### Altri backend Teacher
+
+| Backend | Comando |
+|---------|---------|
+| **Groq** (gratuito) | `python pipeline/knowledge_distiller.py --teacher groq --generate` |
+| **OpenRouter** | `python pipeline/knowledge_distiller.py --teacher openrouter --model qwen/qwen3-32b --generate` |
+| **Ollama** | `python pipeline/knowledge_distiller.py --teacher ollama --model qwen3:32b --generate` |
+
+### Addestramento
+
+```bash
+python pipeline/train_lora.py data/output/distill_dataset.jsonl
+```
+
+### UI
+
+Il tab **Distillazione** nell'interfaccia Gradio permette di:
+- Selezionare backend, modello, tipi di dato e lingue
+- Generare il dataset con un click
+- Addestrare Qwen via LoRA
+- Monitorare lo stato
+
+### Documenti correlati
+- [docs/PIANO_DISTILLAZIONE.md](docs/PIANO_DISTILLAZIONE.md) — Piano dettagliato
+- [docs/FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md) — Cosa usa Qwen per rispondere
+- [docs/TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md) — Manuale tecnico completo
+
 ## 📖 Documentazione
 - [TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md): **Manuale Tecnico Completo.** Architettura, agenti, RAG e roadmap.
+- [UI_MANUAL.md](docs/UI_MANUAL.md): **Manuale dell'Interfaccia Utente.** Descrizione di tutti i tab e controlli.
+- [FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md): **Fonti usate da Qwen.** KB, prompt, flusso RAG.
+- [PIANO_DISTILLAZIONE.md](docs/PIANO_DISTILLAZIONE.md): **Piano di Knowledge Distillation.** Teacher→Student, dataset, training.
 
 ---
 *Progetto sviluppato per preservare e potenziare l'arte della programmazione su sistemi 8-bit.*

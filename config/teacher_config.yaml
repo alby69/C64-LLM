@@ -1,0 +1,19 @@
+teacher:
+  dataset_prefix: distill_dataset
+  model: ''
+  output_dir: data/output
+  quality:
+    min_output_length: 20
+    test_assembly: true
+    test_basic: true
+  strategy:
+    languages:
+    - it
+    - en
+    max_chunks: 50
+    qa_per_chunk: 2
+    types:
+    - factual
+    - code
+    - explain
+  type: opencode

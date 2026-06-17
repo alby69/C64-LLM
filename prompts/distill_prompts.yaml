@@ -1,0 +1,152 @@
+# =====================================================================
+# Prompt templates per Knowledge Distillation
+# =====================================================================
+# Usati dal Teacher per generare dati sintetici dalla Knowledge Base.
+# I template sono in formato libero — il Teacher li interpreta.
+
+factual:
+  name: "Factual Q&A"
+  description: "Domande dirette su registri, indirizzi, comandi, chip"
+  system: >
+    Sei un insegnante di programmazione Commodore 64.
+    Il tuo compito è generare domande e risposte fattuali precise
+    basate esclusivamente sul testo tecnico fornito.
+  user_template: |
+    Leggi questo estratto da un manuale C64:
+
+    ---
+    {chunk}
+    ---
+
+    Genera {count} coppie domanda-risposta in {language} basate
+    su informazioni presenti NEL TESTO SOPRA.
+    Ogni risposta deve essere un fatto preciso (indirizzo, registro,
+    comando, valore).
+
+    NON inventare nulla. Se il testo non contiene abbastanza
+    informazioni per {count} domande, generane di meno.
+
+    Restituisci SOLO un array JSON valido:
+    [
+      {{"instruction": "domanda?", "output": "risposta"}}
+    ]
+
+code:
+  name: "Code Generation"
+  description: "Task di scrittura codice BASIC o Assembly"
+  system: >
+    Sei un programmatore esperto di Commodore 64 che insegna
+    a programmare in Assembly 6502 e BASIC v2.
+  user_template: |
+    Usando le informazioni tecniche qui sotto, crea esempi
+    di codice che un principiante potrebbe chiedere.
+
+    Contesto tecnico:
+    ---
+    {chunk}
+    ---
+
+    Genera {count} esempi in {language} dove:
+    1. La domanda è un task di programmazione realistico
+    2. La risposta è codice Assembly 6502 o BASIC v2 funzionante
+    3. Includi commenti nel codice
+
+    Assembly: usa sintassi ACME, .org $0801 per BASIC SYS.
+    BASIC: numeri di riga incrementali di 10.
+
+    Restituisci SOLO un array JSON valido:
+    [
+      {{
+        "instruction": "Scrivi...",
+        "context": "specifiche aggiuntive",
+        "output": "codice"
+      }}
+    ]
+
+explain:
+  name: "Code Explanation + Chain-of-Thought"
+  description: "Spiegazione passo-passo di concetti tecnici"
+  system: >
+    Sei un tutor di Commodore 64. Spieghi i concetti passo-passo
+    in modo chiaro, come a un principiante.
+  user_template: |
+    Spiega il seguente concetto tecnico C64 in modo strutturato,
+    passo dopo passo.
+
+    Concetto:
+    ---
+    {chunk}
+    ---
+
+    Genera {count} spiegazioni in {language}.
+    Ogni spiegazione deve seguire:
+    1. Cos'è (definizione)
+    2. Come funziona (meccanismo)
+    3. A cosa serve (uso pratico)
+    4. Esempio rapido
+
+    Restituisci SOLO un array JSON valido:
+    [
+      {{"instruction": "Spiega...", "output": "1. ..."}
+    ]
+
+bugfix:
+  name: "Bug Fixing"
+  description: "Codice rotto da correggere + spiegazione errore"
+  system: >
+    Sei un debugger esperto di Commodore 64.
+    Insegni a trovare e correggere errori nel codice.
+  user_template: |
+    Usando il contesto tecnico qui sotto, crea esempi di
+    debugging per studenti.
+
+    Contesto:
+    ---
+    {chunk}
+    ---
+
+    Genera {count} esempi in {language}:
+    1. Scrivi un codice con un errore SUBTILE ma comune
+    2. La risposta deve essere il codice corretto + spiegazione
+       dell'errore
+
+    Errori realistici:
+    - Registro sbagliato ($D020 vs $D021)
+    - Branch fuori range
+    - Dimenticato PHA/PLA in IRQ
+    - BASIC: variabili che collidono (prime 2 lettere)
+    - BASIC: POKE con valore fuori range (0-255)
+
+    Restituisci SOLO un array JSON valido:
+    [
+      {{
+        "instruction": "Perché questo codice non funziona?",
+        "input": "codice sbagliato",
+        "output": "codice corretto + spiegazione"
+      }}
+    ]
+
+theory:
+  name: "Concept Explanation"
+  description: "Spiegazione teorica di concetti fondamentali"
+  system: >
+    Sei un professore di architettura dei calcolatori
+    specializzato nel Commodore 64.
+  user_template: |
+    Spiega il concetto seguente a uno studente che vuole
+    programmare il C64.
+
+    Testo di riferimento:
+    ---
+    {chunk}
+    ---
+
+    Genera {count} domande teoriche in {language}.
+    Ogni risposta deve essere didattica e includere:
+    - Perché è importante
+    - Come si collega ad altri concetti C64
+
+    Restituisci SOLO un array JSON valido:
+    [
+      {{"instruction": "...", "output": "..."}}
+    ]

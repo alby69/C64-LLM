@@ -1,9 +1,10 @@
 from utils.prompt_manager import PromptManager
 from agent.model_backend import ModelBackend
 
+
 class CoderAgent:
     def __init__(self, model, tokenizer):
-        if model is not None and hasattr(model, 'generate'):
+        if model is not None and hasattr(model, "generate"):
             self.backend = model
         elif model is not None:
             self.backend = ModelBackend(model, tokenizer)
@@ -24,7 +25,11 @@ class CoderAgent:
                 "Preferisci la sintassi standard C64. Evita comandi di versioni successive (BASIC 3.5/7.0). "
                 "Usa soluzioni efficienti per la memoria (es. variabili corte, pochi spazi)."
             )
-        elif "assembly" in user_query.lower() or "asm" in user_query.lower() or "assembly" in context.lower():
+        elif (
+            "assembly" in user_query.lower()
+            or "asm" in user_query.lower()
+            or "assembly" in context.lower()
+        ):
             temperature = 0.2
             personality = (
                 "\nPERSONALITÀ: Sei un programmatore professionista di Assembly 6502/6510. "
@@ -37,7 +42,5 @@ class CoderAgent:
         full_prompt += "<|im_start|>assistant\n"
 
         return self.backend.generate(
-            full_prompt,
-            max_new_tokens=1536,
-            temperature=temperature
+            full_prompt, max_new_tokens=768, temperature=temperature
         )

@@ -1,6 +1,6 @@
 # Manuale dell'Interfaccia Utente (UI)
 
-Il C64 Coding Assistant espone un'interfaccia web Gradio su `http://localhost:7860` con 4 tab principali.
+Il C64 Coding Assistant espone un'interfaccia web Gradio su `http://localhost:7860` con 5 tab principali.
 
 ---
 
@@ -14,9 +14,10 @@ Interfaccia conversazionale principale con l'agente C64.
 |----------|-------------|
 | **Chatbot** | Area conversazione: messaggi utente (destra) e risposte agente (sinistra) |
 | **Textbox** | Input per scrivere il messaggio all'agente |
-| **Usa Knowledge Base (RAG)** | Checkbox: se attivo, la risposta viene arricchita con il contesto dell'indice FAISS |
+| **Modalità** | Radio con 4 opzioni: **Base** (solo modello, nessun potenziamento), **RAG** (Knowledge Base FAISS, default), **LoRA** (modello affinato, nessuna KB), **RAG+LoRA** (entrambi: KB per contesto + LoRA per stile) |
 | **Auto-elabora link** | Checkbox: se attivo, estrae automaticamente gli URL dal messaggio e dalla risposta, li aggiunge ai siti personalizzati e avvia la pipeline di download/elaborazione/KB rebuild. Utile per incollare liste di link da sorgenti esterne (es. Claude, ChatGPT). |
 | **Tentativi Self-Healing** | Slider 1-5: numero di tentativi di auto-correzione in caso di codice non valido |
+| **LoRA** | Sezione nella barra laterale: dropdown **Checkpoint** per selezionare un modello LoRA addestrato, pulsante **Applica LoRA** per caricarlo/subirlo, pulsante **🔄** per aggiornare la lista, textbox **Stato** che mostra il checkpoint attivo. |
 | **Prompt Library** | Dropdown di snippet predefiniti: clicca un prompt per inserirlo nella textbox |
 | **Technical Terms** | Nuvola di tag interattiva con ~160 termini tecnici C64 (registri VIC-II, SID, CIA, istruzioni 6502, comandi BASIC, concetti). Clicca un termine per inserirlo nella chat. Filtra in tempo reale con la casella "Cerca". |
 
@@ -119,7 +120,84 @@ I file binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati auto
 
 ---
 
-## Tab 4: Dati
+## Tab 4: Distillazione
+
+Interfaccia per la Knowledge Distillation: generazione di dataset sintetici da Knowledge Base + training LoRA dello studente Qwen2.5-Coder-1.5B-Instruct.
+
+### Guida rapida
+
+1. **Scegli un profilo** dal dropdown "Profilo" (es. ⚡ Rapido, 🔧 Groq Veloce, 🤖 Ollama Locale) — i parametri si impostano automaticamente. Puoi modificarli manualmente e salvare il risultato come nuovo profilo con **💾 Salva**.
+2. **Configura il Teacher**: se usi `opencode` (default) nessuna API key necessaria. Per Groq/OpenRouter/HF seleziona backend, modello e inserisci la chiave.
+3. **Genera Dataset**: clicca **🚀 Genera Dataset** — il log mostra i chunk processati in tempo reale. Il dataset viene salvato in `data/output/distill_dataset.jsonl`.
+4. **Addestra (LoRA)**: clicca **🏋️ Addestra (LoRA)** per avviare il training su Qwen2.5-Coder-1.5B col dataset generato. Usa **📊 Stato** per verificare entry e configurazione attiva.
+
+### Profili di Configurazione
+
+Il sistema a profili permette di salvare e ripristinare configurazioni complete con un click.
+
+| Elemento | Descrizione |
+|----------|-------------|
+| **Profilo** | Dropdown con tutti i profili disponibili (predefiniti + personalizzati). La selezione imposta automaticamente tutti i parametri sottostanti. |
+| **Salva come...** | Textbox per inserire il nome del nuovo profilo. |
+| **💾 Salva** | Salva la configurazione corrente come nuovo profilo personalizzato in `config/distill_profiles.json`. |
+| **🗑️ Elimina** | Elimina il profilo attualmente selezionato (solo profili personalizzati, non i predefiniti). |
+
+#### Profili Predefiniti
+
+| Profilo | Backend | Tipi | Lingue | QA/chunk | Max chunks |
+|---------|---------|------|--------|----------|------------|
+| **⚡ Rapido (base)** | opencode | factual, code, explain | it, en | 2 | 50 |
+| **🇮🇹 Solo Italiano** | opencode | code, theory | it | 3 | 100 |
+| **🌍 Completo (tutti i tipi)** | opencode | factual, code, explain, bugfix, theory | it, en | 2 | 200 |
+| **🏋️ Qualità Expert** | opencode | factual, theory | it, en | 1 | 30 |
+| **🔧 Groq Veloce** | groq (mixtral) | factual, code, bugfix | en | 3 | 100 |
+| **🤖 Ollama Locale** | ollama (llama3) | factual, code, explain, theory | it, en | 2 | 50 |
+
+### Configurazione Teacher
+
+| Elemento | Descrizione |
+|----------|-------------|
+| **Backend** | Dropdown per selezionare il Teacher LLM: `opencode` (default, nessuna API key), `groq`, `openrouter`, `ollama`, `huggingface` |
+| **Modello** | Textbox per specificare il modello Teacher (es. `mixtral-8x7b-32768` per Groq, `gpt-4o` per OpenRouter) |
+| **API Key** | Textbox (password field) per la chiave API del backend scelto (non necessaria per `opencode` e `ollama`; mai salvata nei profili per sicurezza) |
+
+### Strategia di generazione
+
+| Elemento | Descrizione |
+|----------|-------------|
+| **Tipi di dato** | Checkbox group per selezionare i tipi di dato da generare: `factual` (Q&A fattuale), `code` (generazione codice), `explain` (spiegazione codice), `bugfix` (correzione bug), `theory` (teoria e concetti) |
+| **Lingue** | Checkbox group per selezionare le lingue: `it` (italiano), `en` (english) |
+| **QA per chunk** | Slider 1-5: numero di QA pairs da generare per ogni chunk di contesto |
+| **Max chunks** | Slider 10-500: numero massimo di chunk da processare dalla Knowledge Base |
+| **Filtri qualità** | Accordion espandibile con: lunghezza minima risposta (10-200), test Assembly con ACME, test BASIC sintattico |
+| **🚀 Genera Dataset** | Pulsante per avviare la corrispondente azione. Mostra log in tempo reale nella textbox "Log" sottostante. |
+| **📄 Placeholder** | Genera 1 singolo esempio fittizio per testare il training senza dover generare l'intero dataset. |
+
+### Training LoRA
+
+| Elemento | Descrizione |
+|----------|-------------|
+| **Dataset path** | Textbox con il path del dataset JSONL generato (default: `data/output/distill_dataset.jsonl`) |
+| **Output dir** | Textbox con la directory di output per i checkpoint LoRA (default: `data/models/c64-lora-pro`) |
+| **Max sequence length** | Slider 512-4096: lunghezza massima delle sequenze in token (default: 2048) |
+| **🏋️ Addestra (LoRA)** | Pulsante per avviare il training LoRA. Mostra log in tempo reale nella textbox "Log". |
+
+### Stato
+
+| Elemento | Descrizione |
+|----------|-------------|
+| **📊 Stato** | Pulsante che mostra statistiche correnti: numero entry nel dataset distillato, file modello LoRA, configurazione Teacher attiva. |
+| **Log** | Textbox di output (20 righe, scrollabile fino a 40) che mostra in tempo reale i log della generazione e del training. |
+
+### Persistenza
+
+I profili personalizzati vengono salvati in `config/distill_profiles.json` (formato JSON, UTF-8).
+La configurazione attiva del Teacher viene salvata in `config/teacher_config.yaml`.
+Le API key **non** vengono mai salvate nei profili per ragioni di sicurezza.
+
+---
+
+## Tab 5: Dati
 
 ### Dataset Viewer
 

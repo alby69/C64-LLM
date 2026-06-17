@@ -4,6 +4,7 @@ import subprocess
 import time
 import re
 import json
+import yaml
 import signal
 import threading
 from io import StringIO
@@ -48,12 +49,12 @@ class ProcessControl:
 
     def pause(self):
         self.pause_event.clear()
-        if self.proc and self.proc.poll() is None:
+        if self.proc and self.proc.poll() is None and hasattr(signal, "SIGSTOP"):
             self.proc.send_signal(signal.SIGSTOP)
 
     def resume(self):
         self.pause_event.set()
-        if self.proc and self.proc.poll() is None:
+        if self.proc and self.proc.poll() is None and hasattr(signal, "SIGCONT"):
             try:
                 self.proc.send_signal(signal.SIGCONT)
             except ProcessLookupError:
@@ -78,6 +79,7 @@ class ProcessControl:
 
 
 CTRL = ProcessControl()
+agent = None
 
 
 def load_custom_sites():
@@ -125,13 +127,19 @@ def _extract_urls(text: str) -> list[str]:
 
 def _domain_name(url: str) -> str:
     from urllib.parse import urlparse
+
     parsed = urlparse(url)
-    name = re.sub(r'^www\.', '', parsed.netloc or parsed.path)
+    name = re.sub(r"^www\.", "", parsed.netloc or parsed.path)
     return name[:50]
 
 
 class C64CodingAgent:
-    def __init__(self, base_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct", lora_path=None, gguf_path=None):
+    def __init__(
+        self,
+        base_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        lora_path=None,
+        gguf_path=None,
+    ):
         if gguf_path and os.path.exists(gguf_path):
             print(f"Loading GGUF model for CPU: {gguf_path}")
             self.backend = LlamaCppBackend(gguf_path)
@@ -145,29 +153,55 @@ class C64CodingAgent:
                 )
 
                 print(f"Loading base model: {base_model_name}")
-                self.tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    base_model_name, trust_remote_code=True
+                )
                 model = AutoModelForCausalLM.from_pretrained(
                     base_model_name,
                     quantization_config=bnb_config,
                     device_map="auto",
-                    trust_remote_code=True
+                    trust_remote_code=True,
                 )
 
+                base_model = model
                 if lora_path and os.path.exists(lora_path):
                     print(f"Loading LoRA from: {lora_path}")
                     model = PeftModel.from_pretrained(model, lora_path)
 
-                self.backend = ModelBackend(model, self.tokenizer)
+                self.backend = ModelBackend(
+                    model, self.tokenizer, base_model=base_model
+                )
             except Exception as e:
                 print(f"Error loading model with transformers: {e}")
-                print("Falling back to CPU-only mode (Mock/GGUF placeholder if path missing)")
+                print(
+                    "Falling back to CPU-only mode (Mock/GGUF placeholder if path missing)"
+                )
                 self.backend = LlamaCppBackend(gguf_path)
                 self.tokenizer = None
 
         self.pm = PromptManager()
         self.orchestrator = OrchestratorAgent(self.backend, self.tokenizer, pm=self.pm)
+        self._current_lora = None
 
-    def chat_wrapper(self, message, history, use_rag, auto_scrape, max_attempts):
+    def set_lora(self, lora_path):
+        if not lora_path or not os.path.exists(lora_path):
+            return False
+        ok = self.backend.load_lora(lora_path)
+        if ok:
+            self._current_lora = lora_path
+        return ok
+
+    def unload_lora(self):
+        self.backend.unload_lora()
+        self._current_lora = None
+        return True
+
+    @property
+    def active_lora(self):
+        return self._current_lora
+
+    def chat_wrapper(self, message, history, mode, auto_scrape, max_attempts):
+        use_rag = mode in ("RAG", "RAG+LoRA")
         formatted_history: list[tuple[str, str]] = []
         for item in history:
             if isinstance(item, dict):
@@ -182,16 +216,22 @@ class C64CodingAgent:
                 message,
                 use_rag=use_rag,
                 chat_history=formatted_history,
-                max_attempts=int(max_attempts)
+                max_attempts=int(max_attempts),
             )
 
             source_text = ""
             if sources:
-                source_text = "\n\n**Fonti consultate:**\n" + "\n".join([f"- {s}" for s in set(sources)])
+                source_text = "\n\n**Fonti consultate:**\n" + "\n".join(
+                    [f"- {s}" for s in set(sources)]
+                )
 
             log_text = ""
             if logs:
-                log_text = "\n\n<details><summary>Pensieri dell'Agente (Logs)</summary>\n\n" + "\n".join([f"- {l}" for l in logs]) + "\n</details>"
+                log_text = (
+                    "\n\n<details><summary>Pensieri dell'Agente (Logs)</summary>\n\n"
+                    + "\n".join([f"- {l}" for l in logs])
+                    + "\n</details>"
+                )
 
             base = response + source_text + log_text
             yield base
@@ -215,20 +255,32 @@ class C64CodingAgent:
                     added += 1
 
             if added:
-                yield base + f"\n\n---\n📌 **{added} nuovi siti aggiunti.** Avvio pipeline..."
+                yield (
+                    base
+                    + f"\n\n---\n📌 **{added} nuovi siti aggiunti.** Avvio pipeline..."
+                )
             else:
                 yield base + "\n\n---\n📌 **Siti già presenti.** Avvio pipeline..."
 
             for idx, url in enumerate(all_urls, 1):
-                yield base + f"\n\n---\n🔄 **[{idx}/{len(all_urls)}]** {_domain_name(url)}"
+                yield (
+                    base
+                    + f"\n\n---\n🔄 **[{idx}/{len(all_urls)}]** {_domain_name(url)}"
+                )
                 last, count = "", 0
                 for msg in download_and_integrate(url):
                     last, count = msg, count + 1
                     if count % 5 == 0:
                         yield base + f"\n\n---\n🔄 **{_domain_name(url)}**\n{last}"
-                yield base + f"\n\n---\n✅ **[{idx}/{len(all_urls)}]** {_domain_name(url)}\n{last}"
+                yield (
+                    base
+                    + f"\n\n---\n✅ **[{idx}/{len(all_urls)}]** {_domain_name(url)}\n{last}"
+                )
 
-            yield base + f"\n\n---\n✅ **Pipeline completata per {len(all_urls)} URL — KB aggiornata!**"
+            yield (
+                base
+                + f"\n\n---\n✅ **Pipeline completata per {len(all_urls)} URL — KB aggiornata!**"
+            )
 
         except Exception as e:
             yield f"Errore durante l'elaborazione: {str(e)}"
@@ -238,18 +290,31 @@ def log_msg(msg):
     return f"[{CTRL.elapsed()}] {msg}"
 
 
-def run_cmd_gen(cmd):
+def run_cmd_gen(cmd, env=None):
     yield log_msg(f"Avvio: {cmd}")
     CTRL.check_pause()
     if CTRL.cancelled:
         yield log_msg("ANNULLATO")
         return
     try:
-        CTRL.proc = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1, preexec_fn=os.setsid
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+        popen_kwargs = dict(
+            args=cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=merged_env,
         )
+        # Windows non supporta preexec_fn
+        if hasattr(os, "setsid"):
+            popen_kwargs["preexec_fn"] = os.setsid
+        CTRL.proc = subprocess.Popen(**popen_kwargs)
         lines = []
+        errored = False
         for line in iter(CTRL.proc.stdout.readline, ""):
             CTRL.check_pause()
             if CTRL.cancelled:
@@ -257,13 +322,26 @@ def run_cmd_gen(cmd):
                 yield log_msg("ANNULLATO")
                 return
             lines.append(line.rstrip())
+            # Check if the line contains error indicators
+            if any(
+                kw in line.lower()
+                for kw in ["error", "traceback", "exception", "errore"]
+            ):
+                errored = True
             yield "\n".join(lines[-80:])
         CTRL.proc.wait()
-        if CTRL.proc.returncode != 0:
-            lines.append(log_msg(f"ERRORE: codice {CTRL.proc.returncode}"))
+        rc = CTRL.proc.returncode
+        if rc != 0 or errored:
+            lines.append(
+                log_msg(
+                    f"ERRORE: codice {rc}"
+                    + (f" (rilevato errore nel log)" if rc == 0 else "")
+                )
+            )
+            yield "\n".join(lines[-80:])
         else:
             lines.append(log_msg("OK"))
-        yield "\n".join(lines[-80:])
+            yield "\n".join(lines[-80:])
     except Exception as e:
         yield log_msg(f"ERRORE: {e}")
     finally:
@@ -272,20 +350,25 @@ def run_cmd_gen(cmd):
 
 def _extract_html_text(html_path, out_path):
     from html.parser import HTMLParser
+
     class TextExtractor(HTMLParser):
         def __init__(self):
             super().__init__()
             self._text = []
             self._skip = False
+
         def handle_starttag(self, tag, attrs):
             if tag in ("script", "style"):
                 self._skip = True
+
         def handle_endtag(self, tag):
             if tag in ("script", "style"):
                 self._skip = False
+
         def handle_data(self, data):
             if not self._skip:
                 self._text.append(data)
+
     parser = TextExtractor()
     with open(html_path, "r", errors="replace") as f:
         parser.feed(f.read())
@@ -297,20 +380,25 @@ def _extract_html_text(html_path, out_path):
 def _extract_epub_text(epub_path, out_path):
     import zipfile
     from html.parser import HTMLParser
+
     class TextExtractor(HTMLParser):
         def __init__(self):
             super().__init__()
             self._text = []
             self._skip = False
+
         def handle_starttag(self, tag, attrs):
             if tag in ("script", "style"):
                 self._skip = True
+
         def handle_endtag(self, tag):
             if tag in ("script", "style"):
                 self._skip = False
+
         def handle_data(self, data):
             if not self._skip:
                 self._text.append(data)
+
     all_text = []
     with zipfile.ZipFile(epub_path) as z:
         for name in z.namelist():
@@ -339,9 +427,10 @@ def download_and_integrate(url):
     if is_gdrive:
         dest_dir = "data/input"
         os.makedirs(dest_dir, exist_ok=True)
-        match = re.search(r'/drive/folders/([^/?]+)', url)
+        match = re.search(r"/drive/folders/([^/?]+)", url)
         if not match:
-            yield log_msg("URL Google Drive non valido."); return
+            yield log_msg("URL Google Drive non valido.")
+            return
         folder_id = match.group(1)
         out_dir = os.path.join(dest_dir, "drive_" + folder_id)
         os.makedirs(out_dir, exist_ok=True)
@@ -353,23 +442,30 @@ def download_and_integrate(url):
 
         yield log_msg("  Enumerazione file nella cartella...")
         import gdown as _gd
+
         files_info = _gd.download_folder(
             id=folder_id, output=out_dir, quiet=True, skip_download=True
         )
         if not files_info:
-            yield log_msg("  ⚠ Nessun file trovato. Verifica che la cartella sia pubblica.")
+            yield log_msg(
+                "  ⚠ Nessun file trovato. Verifica che la cartella sia pubblica."
+            )
         else:
             dirs_map: dict[str, list] = {}
             for f in files_info:
                 p = os.path.dirname(f.local_path)
                 dirs_map.setdefault(p, []).append(f)
-            yield log_msg(f"  Trovati {len(files_info)} file in {len(dirs_map)} sottocartelle:")
+            yield log_msg(
+                f"  Trovati {len(files_info)} file in {len(dirs_map)} sottocartelle:"
+            )
             for d, flist in sorted(dirs_map.items()):
                 rel = os.path.relpath(d, out_dir)
                 if rel == ".":
                     rel = "(radice)"
                 yield log_msg(f"    [{len(flist):2d}] {rel}")
-            yield log_msg("  Download in corso... (file grandi potrebbero richiedere tempo)")
+            yield log_msg(
+                "  Download in corso... (file grandi potrebbero richiedere tempo)"
+            )
             ok = 0
             err = 0
             skip = 0
@@ -378,7 +474,9 @@ def download_and_integrate(url):
                 fname = os.path.basename(f.local_path)
                 if os.path.exists(f.local_path):
                     sz = os.path.getsize(f.local_path)
-                    yield log_msg(f"  [{i:3d}/{len(files_info)}] {fname}  — {sz/1024/1024:.1f} MB (già presente)")
+                    yield log_msg(
+                        f"  [{i:3d}/{len(files_info)}] {fname}  — {sz / 1024 / 1024:.1f} MB (già presente)"
+                    )
                     skip += 1
                     continue
                 yield log_msg(f"  [{i:3d}/{len(files_info)}] {fname}  — download...")
@@ -392,8 +490,12 @@ def download_and_integrate(url):
                 if not downloaded:
                     try:
                         direct_url = f"https://drive.google.com/uc?id={f.id}&export=download&confirm=t"
-                        r = req.get(direct_url, stream=True, timeout=120, allow_redirects=True)
-                        if r.status_code == 200 and "text/html" not in r.headers.get("content-type", ""):
+                        r = req.get(
+                            direct_url, stream=True, timeout=120, allow_redirects=True
+                        )
+                        if r.status_code == 200 and "text/html" not in r.headers.get(
+                            "content-type", ""
+                        ):
                             with open(f.local_path, "wb") as fout:
                                 for chunk in r.iter_content(8192):
                                     fout.write(chunk)
@@ -402,14 +504,20 @@ def download_and_integrate(url):
                         pass
                 if downloaded:
                     sz = os.path.getsize(f.local_path)
-                    yield log_msg(f"  [{i:3d}/{len(files_info)}] {fname}  — {sz/1024/1024:.1f} MB ✓")
+                    yield log_msg(
+                        f"  [{i:3d}/{len(files_info)}] {fname}  — {sz / 1024 / 1024:.1f} MB ✓"
+                    )
                     ok += 1
                 else:
-                    yield log_msg(f"  [{i:3d}/{len(files_info)}] {fname}  — ERRORE download ✗")
+                    yield log_msg(
+                        f"  [{i:3d}/{len(files_info)}] {fname}  — ERRORE download ✗"
+                    )
                     err += 1
                 if i < len(files_info):
                     time.sleep(1.5)
-            yield log_msg(f"  ══ Riepilogo: {ok} scaricati, {skip} già presenti, {err} errori ══")
+            yield log_msg(
+                f"  ══ Riepilogo: {ok} scaricati, {skip} già presenti, {err} errori ══"
+            )
 
     if is_pdf or is_d64 or is_prg or is_g64 or is_archive or is_gdrive:
         dest = "data/input"
@@ -419,9 +527,11 @@ def download_and_integrate(url):
             yield log_msg("Analizzo contenuto Archive.org...")
             from agent.crawler import WebCrawlerAgent
             import json as _json
-            match = re.search(r'details/([^/?]+)', url)
+
+            match = re.search(r"details/([^/?]+)", url)
             if not match:
-                yield log_msg("URL Archive.org non valido."); return
+                yield log_msg("URL Archive.org non valido.")
+                return
             item_id = match.group(1)
 
             resp = req.get(f"https://archive.org/metadata/{item_id}", timeout=15)
@@ -478,11 +588,17 @@ def download_and_integrate(url):
                             f.write(chunk)
                     ext = os.path.splitext(fname)[1].lower()
                     if ext == ".d64":
-                        yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{local}\" \"{subdir}\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/extract_d64.py "{local}" "{subdir}"'
+                        )
                     elif ext == ".g64":
-                        yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{local}\" \"{subdir}\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/extract_g64.py "{local}" "{subdir}"'
+                        )
                     elif ext == ".prg":
-                        yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{local}\" \"{subdir}\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/extract_prg.py "{local}" "{subdir}"'
+                        )
 
             if text_file:
                 fname = text_file["name"]
@@ -508,6 +624,7 @@ def download_and_integrate(url):
                     raw_path = "data/output/raw.txt"
                     if ext == ".txt":
                         import shutil
+
                         shutil.copy2(local, raw_path)
                         yield log_msg("  Testo già pronto, salto estrazione PDF.")
                     elif ext == ".epub":
@@ -517,19 +634,27 @@ def download_and_integrate(url):
                         except Exception as e:
                             yield log_msg(f"  ERRORE estrazione EPUB: {e}")
                             yield log_msg("  Uso pandoc come fallback...")
-                            yield from run_cmd_gen(f"pandoc \"{local}\" -t plain -o \"{raw_path}\"")
+                            yield from run_cmd_gen(
+                                f'pandoc "{local}" -t plain -o "{raw_path}"'
+                            )
                     elif ext in (".html", ".htm"):
                         yield log_msg("  Estrazione testo da HTML...")
                         _extract_html_text(local, raw_path)
                     else:
                         yield log_msg("  Estrazione testo da PDF...")
-                        yield from run_cmd_gen(f"python pipeline/pdf2text.py \"{local}\" \"{raw_path}\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/pdf2text.py "{local}" "{raw_path}"'
+                        )
 
                     if os.path.exists(raw_path):
                         yield log_msg("Pulizia testo...")
-                        yield from run_cmd_gen(f"python pipeline/text_cleaner.py \"{raw_path}\" \"data/output/clean.txt\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/text_cleaner.py "{raw_path}" "data/output/clean.txt"'
+                        )
                         yield log_msg("Generazione dataset...")
-                        yield from run_cmd_gen("python pipeline/build_dataset.py data data/output/dataset_unified.jsonl")
+                        yield from run_cmd_gen(
+                            "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                        )
                     else:
                         yield log_msg("  Nessun testo estratto.")
             else:
@@ -548,7 +673,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"D64 scaricato: {path}")
-            yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{path}\" \"{dest}\"")
+            yield from run_cmd_gen(f'python pipeline/extract_d64.py "{path}" "{dest}"')
 
         elif is_g64:
             yield log_msg("Download G64...")
@@ -560,7 +685,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"G64 scaricato: {path}")
-            yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{path}\" \"{dest}\"")
+            yield from run_cmd_gen(f'python pipeline/extract_g64.py "{path}" "{dest}"')
 
         elif is_prg:
             yield log_msg("Download PRG...")
@@ -572,7 +697,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"PRG scaricato: {path}")
-            yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{path}\" \"{dest}\"")
+            yield from run_cmd_gen(f'python pipeline/extract_prg.py "{path}" "{dest}"')
 
         elif is_gdrive:
             gdrive_dir = os.path.join(dest, "drive_" + folder_id)
@@ -588,8 +713,12 @@ def download_and_integrate(url):
                 combined = []
                 for i, pdf_path in enumerate(pdfs):
                     tmp = f"data/output/raw_pdf{i}.txt"
-                    yield log_msg(f"  [{i+1}/{len(pdfs)}] {os.path.basename(pdf_path)}")
-                    yield from run_cmd_gen(f"python pipeline/pdf2text.py \"{pdf_path}\" \"{tmp}\"")
+                    yield log_msg(
+                        f"  [{i + 1}/{len(pdfs)}] {os.path.basename(pdf_path)}"
+                    )
+                    yield from run_cmd_gen(
+                        f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                    )
                     if os.path.exists(tmp):
                         try:
                             with open(tmp, encoding="utf-8", errors="replace") as f:
@@ -607,10 +736,16 @@ def download_and_integrate(url):
                 if combined:
                     with open("data/output/raw.txt", "w", encoding="utf-8") as f:
                         f.write("\n\n".join(combined))
-                    yield log_msg(f"  Uniti {len(combined)}/{len(pdfs)} PDF con testo, pulizia...")
-                    yield from run_cmd_gen("python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt")
+                    yield log_msg(
+                        f"  Uniti {len(combined)}/{len(pdfs)} PDF con testo, pulizia..."
+                    )
+                    yield from run_cmd_gen(
+                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+                    )
                     yield log_msg("Generazione dataset...")
-                    yield from run_cmd_gen("python pipeline/build_dataset.py data data/output/dataset_unified.jsonl")
+                    yield from run_cmd_gen(
+                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                    )
                 else:
                     yield log_msg("  Nessun PDF con testo estraibile.")
             else:
@@ -664,18 +799,26 @@ def download_and_integrate(url):
                 if fname.lower().endswith(".pdf"):
                     pdfs.append(os.path.join(root, fname))
                 elif fname.lower().endswith(".d64"):
-                    yield from run_cmd_gen(f"python pipeline/extract_d64.py \"{os.path.join(root, fname)}\" \"{root}\"")
+                    yield from run_cmd_gen(
+                        f'python pipeline/extract_d64.py "{os.path.join(root, fname)}" "{root}"'
+                    )
                 elif fname.lower().endswith(".g64"):
-                    yield from run_cmd_gen(f"python pipeline/extract_g64.py \"{os.path.join(root, fname)}\" \"{root}\"")
+                    yield from run_cmd_gen(
+                        f'python pipeline/extract_g64.py "{os.path.join(root, fname)}" "{root}"'
+                    )
                 elif fname.lower().endswith(".prg"):
-                    yield from run_cmd_gen(f"python pipeline/extract_prg.py \"{os.path.join(root, fname)}\" \"{root}\"")
+                    yield from run_cmd_gen(
+                        f'python pipeline/extract_prg.py "{os.path.join(root, fname)}" "{root}"'
+                    )
 
         if pdfs:
             combined = []
             for i, pdf_path in enumerate(pdfs):
                 tmp = f"data/output/raw_pdf{i}.txt"
                 yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
-                yield from run_cmd_gen(f"python pipeline/pdf2text.py \"{pdf_path}\" \"{tmp}\"")
+                yield from run_cmd_gen(
+                    f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                )
                 if os.path.exists(tmp):
                     with open(tmp) as f:
                         combined.append(f.read())
@@ -684,9 +827,13 @@ def download_and_integrate(url):
                 f.write("\n\n".join(combined))
             yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
             yield log_msg("Pulizia testo...")
-            yield from run_cmd_gen("python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt")
+            yield from run_cmd_gen(
+                "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+            )
             yield log_msg("Generazione dataset...")
-            yield from run_cmd_gen("python pipeline/build_dataset.py data data/output/dataset_unified.jsonl")
+            yield from run_cmd_gen(
+                "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+            )
         else:
             yield log_msg("Nessun PDF trovato.")
 
@@ -701,7 +848,8 @@ def download_and_integrate(url):
                 sys.stdout = old_stdout
                 yield out
             except Exception as e:
-                yield log_msg(f"ERRORE KB: {e}"); return
+                yield log_msg(f"ERRORE KB: {e}")
+                return
 
         yield log_msg("COMPLETATO")
 
@@ -721,10 +869,12 @@ def on_rebuild():
     finally:
         sys.stdout = old_stdout
 
+
 def on_process_local():
     """Processa tutti i documenti in data/input e ricostruisce la KB."""
     try:
         from pipeline.process_batch import process_all_pdfs
+
         yield log_msg("Avvio elaborazione documenti locali in data/input...")
 
         process_all_pdfs(["data/input"], "data/output")
@@ -736,7 +886,11 @@ def on_process_local():
             kb = C64KnowledgeBase()
             kb.build_index()
             out = sys.stdout.getvalue()
-            yield out + "\n" + log_msg("✅ Elaborazione locale completata e KB aggiornata!")
+            yield (
+                out
+                + "\n"
+                + log_msg("✅ Elaborazione locale completata e KB aggiornata!")
+            )
         finally:
             sys.stdout = old_stdout
 
@@ -766,8 +920,14 @@ def list_kb_files():
         files.sort(key=lambda x: -x[1])
         lines.append(f"\n📁 {label} ({len(files)} file):")
         for fp, sz in files:
-            sz_str = f"{sz}B" if sz < 1024 else f"{sz/1024:.1f}KB" if sz < 1048576 else f"{sz/1048576:.1f}MB"
-            rel = fp[len(directory)+1:] if fp.startswith(directory) else fp
+            sz_str = (
+                f"{sz}B"
+                if sz < 1024
+                else f"{sz / 1024:.1f}KB"
+                if sz < 1048576
+                else f"{sz / 1048576:.1f}MB"
+            )
+            rel = fp[len(directory) + 1 :] if fp.startswith(directory) else fp
             lines.append(f"    {rel:60s} {sz_str:>8s}")
     return "\n".join(lines)
 
@@ -792,7 +952,11 @@ def preview_kb_file(rel_path):
         sz = os.path.getsize(full_path)
         lines = content.split("\n")
         preview = "\n".join(lines[:50])
-        extra = f"\n\n... ({len(lines) - 50} righe in piu', {sz} byte totali)" if len(lines) > 50 else ""
+        extra = (
+            f"\n\n... ({len(lines) - 50} righe in piu', {sz} byte totali)"
+            if len(lines) > 50
+            else ""
+        )
         return f"--- {rel_path} ({sz} byte) ---\n\n{preview}{extra}"
     except UnicodeDecodeError:
         return f"File binario (non visualizzabile come testo): {rel_path}"
@@ -825,7 +989,7 @@ def search_kb_files(query):
         for root, _, fnames in os.walk(directory):
             for f in fnames:
                 fp = os.path.join(root, f)
-                rel = fp[len(directory)+1:] if fp.startswith(directory) else fp
+                rel = fp[len(directory) + 1 :] if fp.startswith(directory) else fp
                 if query_lower in rel.lower() or query_lower in f.lower():
                     sz = os.path.getsize(fp)
                     files.append((rel, sz))
@@ -833,7 +997,13 @@ def search_kb_files(query):
             files.sort(key=lambda x: -x[1])
             lines.append(f"\n📁 {label} ({len(files)} corrispondenze):")
             for rel, sz in files:
-                sz_str = f"{sz}B" if sz < 1024 else f"{sz/1024:.1f}KB" if sz < 1048576 else f"{sz/1048576:.1f}MB"
+                sz_str = (
+                    f"{sz}B"
+                    if sz < 1024
+                    else f"{sz / 1024:.1f}KB"
+                    if sz < 1048576
+                    else f"{sz / 1048576:.1f}MB"
+                )
                 lines.append(f"    {rel:60s} {sz_str:>8s}")
     if not lines:
         return f"Nessun file trovato per: {query}"
@@ -873,6 +1043,7 @@ PAGE_SIZE = 20
 
 def _fmt_dataset_html(lines, page, query=""):
     import html as _html
+
     cards = []
     for i, line in enumerate(lines):
         try:
@@ -884,10 +1055,14 @@ def _fmt_dataset_html(lines, page, query=""):
         constraints = entry.get("constraints", [])
         output = entry.get("output", "")
         num = page * PAGE_SIZE + i + 1
-        tags = " ".join(
-            f'<span style="display:inline-block;background:#334;padding:1px 8px;border-radius:4px;margin:2px;font-size:0.85em;color:#eee">{_html.escape(c)}</span>'
-            for c in constraints
-        ) if constraints else ""
+        tags = (
+            " ".join(
+                f'<span style="display:inline-block;background:#334;padding:1px 8px;border-radius:4px;margin:2px;font-size:0.85em;color:#eee">{_html.escape(c)}</span>'
+                for c in constraints
+            )
+            if constraints
+            else ""
+        )
         card = (
             f'<div style="border:1px solid #555;border-radius:8px;padding:12px;margin:0 6px;'
             f'min-width:360px;max-width:420px;background:#1e1e30;color:#f0f0f0;flex-shrink:0;font-family:sans-serif">'
@@ -901,7 +1076,7 @@ def _fmt_dataset_html(lines, page, query=""):
         card += (
             f'<pre style="background:#0d0d1a;border:1px solid #333;border-radius:4px;padding:8px;'
             f'margin-top:6px;overflow-x:auto;white-space:pre-wrap;font-size:0.85em;color:#ddd;max-height:300px">{_html.escape(output)}</pre>'
-            f'</div>'
+            f"</div>"
         )
         cards.append(card)
     body = "".join(cards)
@@ -915,7 +1090,11 @@ def on_view_dataset(page=0, query=""):
         query = ""
     path = "data/output/dataset_unified.jsonl"
     if not os.path.exists(path):
-        return "<div style='color:#ff6;padding:20px;text-align:center'>Dataset non trovato. Esegui prima la pipeline.</div>", 0, ""
+        return (
+            "<div style='color:#ff6;padding:20px;text-align:center'>Dataset non trovato. Esegui prima la pipeline.</div>",
+            0,
+            "",
+        )
     with open(path) as f:
         lines = f.readlines()
     q = query.strip().lower()
@@ -926,61 +1105,530 @@ def on_view_dataset(page=0, query=""):
     page = max(0, min(int(page), max_page))
     start = page * PAGE_SIZE
     end = min(start + PAGE_SIZE, total)
-    label = f"Dataset: {total} entries" + (f" per '{query.strip()}'" if query.strip() else "")
-    header = f'<div style="font-weight:bold;margin-bottom:6px;font-size:1.05em;color:#ddd">{label} | Pagina {page+1}/{max_page+1} (righe {start+1}-{end})</div>'
+    label = f"Dataset: {total} entries" + (
+        f" per '{query.strip()}'" if query.strip() else ""
+    )
+    header = f'<div style="font-weight:bold;margin-bottom:6px;font-size:1.05em;color:#ddd">{label} | Pagina {page + 1}/{max_page + 1} (righe {start + 1}-{end})</div>'
     body = _fmt_dataset_html(lines[start:end], page, query)
     return header + body, page, query
 
 
+# ============================================================
+# DISTILLAZIONE callback
+# ============================================================
+DISTILL_CONFIG_PATH = "config/teacher_config.yaml"
+DISTILL_PROFILES_PATH = "config/distill_profiles.json"
+
+PREDEFINED_DISTILL_PROFILES = {
+    "⚡ Rapido (base)": {
+        "backend": "opencode",
+        "model": "",
+        "types": ["factual", "code", "explain"],
+        "languages": ["it", "en"],
+        "qa_per_chunk": 2,
+        "max_chunks": 50,
+        "min_output_len": 20,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+    "🇮🇹 Solo Italiano": {
+        "backend": "opencode",
+        "model": "",
+        "types": ["code", "theory"],
+        "languages": ["it"],
+        "qa_per_chunk": 3,
+        "max_chunks": 100,
+        "min_output_len": 30,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+    "🌍 Completo (tutti i tipi)": {
+        "backend": "opencode",
+        "model": "",
+        "types": ["factual", "code", "explain", "bugfix", "theory"],
+        "languages": ["it", "en"],
+        "qa_per_chunk": 2,
+        "max_chunks": 200,
+        "min_output_len": 20,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+    "🏋️ Qualità Expert": {
+        "backend": "opencode",
+        "model": "",
+        "types": ["factual", "theory"],
+        "languages": ["it", "en"],
+        "qa_per_chunk": 1,
+        "max_chunks": 30,
+        "min_output_len": 50,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+    "🔧 Groq Veloce": {
+        "backend": "groq",
+        "model": "mixtral-8x7b-32768",
+        "types": ["factual", "code", "bugfix"],
+        "languages": ["en"],
+        "qa_per_chunk": 3,
+        "max_chunks": 100,
+        "min_output_len": 20,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+    "🤖 Ollama Locale": {
+        "backend": "ollama",
+        "model": "llama3",
+        "types": ["factual", "code", "explain", "theory"],
+        "languages": ["it", "en"],
+        "qa_per_chunk": 2,
+        "max_chunks": 50,
+        "min_output_len": 20,
+        "test_assembly": True,
+        "test_basic": True,
+    },
+}
+
+
+def load_distill_config():
+    if not os.path.exists(DISTILL_CONFIG_PATH):
+        return {"teacher": {"type": "opencode", "strategy": {}, "quality": {}}}
+    with open(DISTILL_CONFIG_PATH) as f:
+        return yaml.safe_load(f)
+
+
+def save_distill_config(cfg):
+    os.makedirs(os.path.dirname(DISTILL_CONFIG_PATH), exist_ok=True)
+    with open(DISTILL_CONFIG_PATH, "w") as f:
+        yaml.dump(cfg, f, default_flow_style=False)
+
+
+def load_user_distill_profiles():
+    if not os.path.exists(DISTILL_PROFILES_PATH):
+        return {}
+    with open(DISTILL_PROFILES_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_user_distill_profiles(profiles):
+    os.makedirs(os.path.dirname(DISTILL_PROFILES_PATH), exist_ok=True)
+    with open(DISTILL_PROFILES_PATH, "w", encoding="utf-8") as f:
+        json.dump(profiles, f, indent=2, ensure_ascii=False)
+
+
+def get_distill_profile(name):
+    user = load_user_distill_profiles()
+    if name in user:
+        return user[name]
+    return PREDEFINED_DISTILL_PROFILES.get(name)
+
+
+def get_all_profile_names():
+    user = load_user_distill_profiles()
+    user_keys = set(user.keys())
+    names = [n for n in PREDEFINED_DISTILL_PROFILES if n not in user_keys]
+    names.extend(user.keys())
+    return names
+
+
+def on_distill_load_profile(profile_name):
+    if not profile_name:
+        profile_name = "⚡ Rapido (base)"
+    profile = get_distill_profile(profile_name)
+    if not profile:
+        profile = PREDEFINED_DISTILL_PROFILES["⚡ Rapido (base)"]
+    return [
+        profile.get("backend", "opencode"),
+        profile.get("model", ""),
+        "",
+        profile.get("types", ["factual", "code", "explain"]),
+        profile.get("languages", ["it", "en"]),
+        profile.get("qa_per_chunk", 2),
+        profile.get("max_chunks", 50),
+        profile.get("min_output_len", 20),
+        profile.get("test_assembly", True),
+        profile.get("test_basic", True),
+    ]
+
+
+def on_distill_save_profile(
+    name,
+    backend,
+    model,
+    types,
+    languages,
+    qa_per_chunk,
+    max_chunks,
+    min_output_len,
+    test_assembly,
+    test_basic,
+):
+    name = name.strip()
+    if not name:
+        raise gr.Error("Inserisci un nome per il profilo")
+    profiles = load_user_distill_profiles()
+    profiles[name] = {
+        "backend": backend,
+        "model": model,
+        "types": list(types) if types else [],
+        "languages": list(languages) if languages else [],
+        "qa_per_chunk": qa_per_chunk,
+        "max_chunks": max_chunks,
+        "min_output_len": min_output_len,
+        "test_assembly": test_assembly,
+        "test_basic": test_basic,
+    }
+    save_user_distill_profiles(profiles)
+    names = get_all_profile_names()
+    return gr.Dropdown(choices=names, value=name), ""
+
+
+def on_distill_delete_profile(profile_name):
+    if not profile_name:
+        raise gr.Error("Seleziona un profilo da eliminare")
+    if profile_name in PREDEFINED_DISTILL_PROFILES:
+        raise gr.Error("I profili predefiniti non possono essere eliminati")
+    profiles = load_user_distill_profiles()
+    if profile_name in profiles:
+        del profiles[profile_name]
+        save_user_distill_profiles(profiles)
+    names = get_all_profile_names()
+    first = names[0] if names else ""
+    return gr.Dropdown(choices=names, value=first)
+
+
+def on_distill_generate(
+    backend,
+    model_name,
+    api_key,
+    types,
+    languages,
+    qa_per_chunk,
+    max_chunks,
+    min_output_len,
+    test_asm,
+    test_basic,
+):
+    CTRL.reset()
+    CTRL.start_time = time.time()
+    CTRL.running = True
+
+    cfg = load_distill_config()
+    cfg["teacher"]["type"] = backend
+    cfg["teacher"]["model"] = model_name
+    if api_key:
+        cfg["teacher"]["api_key"] = api_key
+    cfg["teacher"]["strategy"] = {
+        "types": types,
+        "languages": languages,
+        "qa_per_chunk": qa_per_chunk,
+        "max_chunks": max_chunks,
+    }
+    cfg["teacher"]["quality"] = {
+        "min_output_length": min_output_len,
+        "test_assembly": test_asm,
+        "test_basic": test_basic,
+    }
+    save_distill_config(cfg)
+
+    cmd = f"python pipeline/knowledge_distiller.py --generate"
+    if backend != "opencode":
+        cmd += f" --teacher {backend}"
+        if model_name:
+            cmd += f" --model {model_name}"
+    if max_chunks:
+        cmd += f" --max-chunks {max_chunks}"
+
+    yield log_msg(f"Avvio distillazione con Teacher: {backend}...")
+    for msg in run_cmd_gen(cmd):
+        yield msg
+        if CTRL.cancelled:
+            return
+
+    if not CTRL.cancelled:
+        yield log_msg(
+            "✅ Dataset distillato generato in data/output/distill_dataset.jsonl"
+        )
+
+    CTRL.running = False
+
+
+def on_distill_train(dataset_path, output_dir, max_seq_length):
+    CTRL.reset()
+    CTRL.start_time = time.time()
+    CTRL.running = True
+    log_path = os.path.join(output_dir, "training_log.txt")
+    yield log_msg(f"Avvio training LoRA...")
+    yield log_msg(f"Log completo salvato in: {log_path}")
+    cmd = f"python pipeline/train_lora.py {dataset_path}"
+    env = {"OUTPUT_DIR": output_dir, "MAX_SEQ_LENGTH": str(max_seq_length)}
+    all_lines = []
+    for msg in run_cmd_gen(cmd, env=env):
+        yield msg
+        all_lines.append(msg)
+        if CTRL.cancelled:
+            return
+    # Save full log to file
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            for line in all_lines:
+                f.write(line + "\n")
+    except Exception:
+        pass
+    if not CTRL.cancelled:
+        yield log_msg(f"✅ Training completato! Modello salvato in {output_dir}")
+    CTRL.running = False
+
+
+def on_distill_status():
+    lines = []
+    ds_path = "data/output/distill_dataset.jsonl"
+    if os.path.exists(ds_path):
+        with open(ds_path) as f:
+            n = sum(1 for _ in f)
+        lines.append(f"Dataset distillato: {n} entries")
+        lines.append(f"Percorso: {ds_path}")
+    else:
+        lines.append("Dataset distillato: non ancora generato")
+    model_dir = "data/models/c64-lora-pro"
+    if os.path.exists(model_dir):
+        files = os.listdir(model_dir)
+        lines.append(f"Modello LoRA: {len(files)} file in {model_dir}")
+    else:
+        lines.append("Modello LoRA: non ancora addestrato")
+    cfg = load_distill_config()
+    lines.append(f"Teacher config: type={cfg.get('teacher', {}).get('type', '?')}")
+    strategy = cfg.get("teacher", {}).get("strategy", {})
+    if strategy:
+        lines.append(f"  Tipi: {','.join(strategy.get('types', []))}")
+        lines.append(f"  Lingue: {','.join(strategy.get('languages', []))}")
+        lines.append(f"  QA/chunk: {strategy.get('qa_per_chunk', '?')}")
+        lines.append(f"  Max chunks: {strategy.get('max_chunks', '?')}")
+    return "\n".join(lines)
+
+
+def on_distill_placeholder():
+    yield log_msg("Generazione placeholder...")
+    from pipeline.knowledge_distiller import KnowledgeDistiller
+
+    d = KnowledgeDistiller()
+    d.save_placeholder("data/output/distill_dataset.jsonl")
+    yield log_msg("✅ Placeholder salvato")
+
+
+def scan_lora_checkpoints():
+    dirs = []
+    base_dirs = ["data/models/c64-lora-pro", "data/models"]
+    seen = set()
+
+    def _has_adapter(path):
+        return (
+            os.path.isdir(path)
+            and os.path.exists(os.path.join(path, "adapter_config.json"))
+            and (
+                os.path.exists(os.path.join(path, "adapter_model.safetensors"))
+                or os.path.exists(os.path.join(path, "adapter_model.bin"))
+            )
+        )
+
+    for base in base_dirs:
+        if not os.path.exists(base):
+            continue
+        # Check if the base dir itself is a valid LoRA checkpoint
+        if _has_adapter(base) and base not in seen:
+            seen.add(base)
+            name = os.path.basename(base)
+            dirs.append((name, base))
+        # Check subdirectories for checkpoints
+        for entry in sorted(os.listdir(base)):
+            full = os.path.join(base, entry)
+            if not os.path.isdir(full):
+                continue
+            if _has_adapter(full) and full not in seen:
+                seen.add(full)
+                dirs.append((entry, full))
+    return dirs
+
+
+def apply_lora(mode, lora_path):
+    if mode in ("LoRA", "RAG+LoRA"):
+        if not lora_path:
+            return "⚠️ Seleziona un checkpoint LoRA dal menu."
+        ok = agent.set_lora(lora_path)
+        name = os.path.basename(lora_path)
+        return f"✅ LoRA attivo: {name}" if ok else f"❌ Errore caricando {name}"
+    else:
+        agent.unload_lora()
+        return "ℹ️ Modello base (nessun LoRA caricato)"
+
+
+def refresh_lora_list():
+    choices = scan_lora_checkpoints()
+    return gr.Dropdown(choices=choices, value=None)
+
+
+def get_lora_status():
+    path = agent.active_lora
+    if path:
+        return f"✅ LoRA: {os.path.basename(path)}"
+    return "ℹ️ Modello base"
+
+
 TECHNICAL_TERMS = {
-    "$D020": 5, "$D021": 4, "$D022": 2, "$D023": 2,
-    "$D011": 4, "$D012": 5, "$D013": 2, "$D01A": 3,
-    "$D019": 3, "$D01E": 2, "$D01F": 2, "$D01D": 2,
-    "$D400": 3, "$D418": 3, "$D41B": 2,
-    "$D800": 4, "$D81D": 2,
-    "$DC00": 3, "$DC01": 3, "$DC0D": 2,
-    "$DD00": 3, "$DD0D": 2,
-    "$0314": 4, "$0315": 3,
-    "$FFD2": 4, "$FFE4": 3, "$FFCF": 2, "$FF81": 2,
-    "VIC-II": 5, "SID": 5, "CIA": 4, "KERNAL": 5,
-    "Zero Page": 4, "Stack Pointer": 3, "Program Counter": 3,
-    "Accumulator": 4, "X Register": 3, "Y Register": 3,
-    "Status Register": 3, "Carry Flag": 3, "Zero Flag": 3,
-    "Interrupt Flag": 2, "Decimal Flag": 2, "Overflow Flag": 2,
-    "Negative Flag": 2, "Raster Interrupt": 5, "IRQ": 4,
-    "NMI": 3, "Sprite": 4, "Sprite Pointer": 3,
-    "Memory Map": 4, "Screen Memory": 3, "Character ROM": 3,
-    "Color RAM": 3, "Bitmap": 3, "Bitmap Mode": 3,
-    "Multicolor Mode": 3, "Hi-res Mode": 2, "Text Mode": 3,
-    "Extended Color Mode": 2, "Scrolling": 3, "Collision": 2,
-    "Sprite Collision": 3, "Raster": 4, "Bad Line": 2,
-    "Display Enable": 2, "Interrupt": 4, "BRK": 3,
-    "RTI": 3, "RTS": 4, "JSR": 4, "JMP": 4,
-    "LDA": 5, "STA": 5, "LDX": 4, "STX": 4,
-    "LDY": 4, "STY": 4, "TAX": 3, "TAY": 3,
-    "TXA": 3, "TYA": 3, "ADC": 4, "SBC": 4,
-    "AND": 3, "ORA": 3, "EOR": 3, "CMP": 3,
-    "CPX": 2, "CPY": 2, "INC": 4, "DEC": 4,
-    "INX": 3, "INY": 3, "DEX": 3, "DEY": 3,
-    "ASL": 3, "LSR": 3, "ROL": 3, "ROR": 3,
-    "PHA": 3, "PLA": 3, "PHP": 2, "PLP": 2,
-    "BCC": 3, "BCS": 3, "BEQ": 3, "BNE": 3,
-    "BMI": 2, "BPL": 2, "BVC": 2, "BVS": 2,
-    "CLC": 3, "SEC": 3, "CLD": 2, "SED": 2,
-    "CLI": 2, "SEI": 2, "CLV": 2, "NOP": 2,
-    "PRINT": 4, "POKE": 5, "PEEK": 4, "SYS": 4,
-    "GOTO": 3, "GOSUB": 3, "RETURN": 3, "FOR": 3,
-    "NEXT": 3, "IF": 4, "THEN": 3, "DIM": 3,
-    "DATA": 2, "READ": 2, "OPEN": 2, "CLOSE": 2,
-    "LOAD": 3, "SAVE": 3, "VERIFY": 2, "INPUT": 3,
-    "GET": 3, "REM": 2, "END": 2, "STOP": 2,
-    "WAIT": 2, "POKE raster": 3, "SETTING raster": 3,
+    "$D020": 5,
+    "$D021": 4,
+    "$D022": 2,
+    "$D023": 2,
+    "$D011": 4,
+    "$D012": 5,
+    "$D013": 2,
+    "$D01A": 3,
+    "$D019": 3,
+    "$D01E": 2,
+    "$D01F": 2,
+    "$D01D": 2,
+    "$D400": 3,
+    "$D418": 3,
+    "$D41B": 2,
+    "$D800": 4,
+    "$D81D": 2,
+    "$DC00": 3,
+    "$DC01": 3,
+    "$DC0D": 2,
+    "$DD00": 3,
+    "$DD0D": 2,
+    "$0314": 4,
+    "$0315": 3,
+    "$FFD2": 4,
+    "$FFE4": 3,
+    "$FFCF": 2,
+    "$FF81": 2,
+    "VIC-II": 5,
+    "SID": 5,
+    "CIA": 4,
+    "KERNAL": 5,
+    "Zero Page": 4,
+    "Stack Pointer": 3,
+    "Program Counter": 3,
+    "Accumulator": 4,
+    "X Register": 3,
+    "Y Register": 3,
+    "Status Register": 3,
+    "Carry Flag": 3,
+    "Zero Flag": 3,
+    "Interrupt Flag": 2,
+    "Decimal Flag": 2,
+    "Overflow Flag": 2,
+    "Negative Flag": 2,
+    "Raster Interrupt": 5,
+    "IRQ": 4,
+    "NMI": 3,
+    "Sprite": 4,
+    "Sprite Pointer": 3,
+    "Memory Map": 4,
+    "Screen Memory": 3,
+    "Character ROM": 3,
+    "Color RAM": 3,
+    "Bitmap": 3,
+    "Bitmap Mode": 3,
+    "Multicolor Mode": 3,
+    "Hi-res Mode": 2,
+    "Text Mode": 3,
+    "Extended Color Mode": 2,
+    "Scrolling": 3,
+    "Collision": 2,
+    "Sprite Collision": 3,
+    "Raster": 4,
+    "Bad Line": 2,
+    "Display Enable": 2,
+    "Interrupt": 4,
+    "BRK": 3,
+    "RTI": 3,
+    "RTS": 4,
+    "JSR": 4,
+    "JMP": 4,
+    "LDA": 5,
+    "STA": 5,
+    "LDX": 4,
+    "STX": 4,
+    "LDY": 4,
+    "STY": 4,
+    "TAX": 3,
+    "TAY": 3,
+    "TXA": 3,
+    "TYA": 3,
+    "ADC": 4,
+    "SBC": 4,
+    "AND": 3,
+    "ORA": 3,
+    "EOR": 3,
+    "CMP": 3,
+    "CPX": 2,
+    "CPY": 2,
+    "INC": 4,
+    "DEC": 4,
+    "INX": 3,
+    "INY": 3,
+    "DEX": 3,
+    "DEY": 3,
+    "ASL": 3,
+    "LSR": 3,
+    "ROL": 3,
+    "ROR": 3,
+    "PHA": 3,
+    "PLA": 3,
+    "PHP": 2,
+    "PLP": 2,
+    "BCC": 3,
+    "BCS": 3,
+    "BEQ": 3,
+    "BNE": 3,
+    "BMI": 2,
+    "BPL": 2,
+    "BVC": 2,
+    "BVS": 2,
+    "CLC": 3,
+    "SEC": 3,
+    "CLD": 2,
+    "SED": 2,
+    "CLI": 2,
+    "SEI": 2,
+    "CLV": 2,
+    "NOP": 2,
+    "PRINT": 4,
+    "POKE": 5,
+    "PEEK": 4,
+    "SYS": 4,
+    "GOTO": 3,
+    "GOSUB": 3,
+    "RETURN": 3,
+    "FOR": 3,
+    "NEXT": 3,
+    "IF": 4,
+    "THEN": 3,
+    "DIM": 3,
+    "DATA": 2,
+    "READ": 2,
+    "OPEN": 2,
+    "CLOSE": 2,
+    "LOAD": 3,
+    "SAVE": 3,
+    "VERIFY": 2,
+    "INPUT": 3,
+    "GET": 3,
+    "REM": 2,
+    "END": 2,
+    "STOP": 2,
+    "WAIT": 2,
+    "POKE raster": 3,
+    "SETTING raster": 3,
 }
 
 
 def render_tag_cloud(query=""):
     filtered = {
-        t: w for t, w in TECHNICAL_TERMS.items()
+        t: w
+        for t, w in TECHNICAL_TERMS.items()
         if not query or query.lower() in t.lower()
     }
     if not filtered:
@@ -1029,13 +1677,15 @@ def bootstrap():
         "data/models",
         "data/src",
         "data/vectorstore",
-        "knowledge_base"
+        "knowledge_base",
     ]
     for d in dirs:
         os.makedirs(d, exist_ok=True)
     print(f"Bootstrap completato: {len(dirs)} cartelle verificate/create.")
 
+
 def launch_ui():
+    global agent
     bootstrap()
     lora = os.environ.get("LORA_PATH")
     gguf = os.environ.get("GGUF_MODEL_PATH")
@@ -1047,33 +1697,59 @@ def launch_ui():
     if not isinstance(prompt_library, list):
         prompt_library = [
             "Come posso cambiare il colore del bordo?",
-            "Esegui un ciclo in BASIC..."
+            "Esegui un ciclo in BASIC...",
         ]
 
     with gr.Blocks(title="C64 Coding Agent PRO") as demo:
         with gr.Tab("Chat"):
             gr.Markdown("# C64 Coding Agent PRO")
-            gr.Markdown("Esperto in Assembly 6502 e BASIC v2 con Knowledge Base integrato.")
+            gr.Markdown(
+                "Esperto in Assembly 6502 e BASIC v2 con Knowledge Base integrato."
+            )
 
             with gr.Row():
                 with gr.Column(scale=4):
                     chat_interface = gr.ChatInterface(
                         agent.chat_wrapper,
                         additional_inputs=[
-                            gr.Checkbox(label="Usa Knowledge Base (RAG)", value=True),
-                            gr.Checkbox(label="Auto-elabora link (aggiungi siti + pipeline)", value=False),
-                            gr.Slider(
+                            mode_radio := gr.Radio(
+                                ["Base", "RAG", "LoRA", "RAG+LoRA"],
+                                value="RAG",
+                                label="Modalità",
+                            ),
+                            auto_scrape_box := gr.Checkbox(
+                                label="Auto-elabora link (aggiungi siti + pipeline)",
+                                value=False,
+                            ),
+                            max_attempts_slider := gr.Slider(
                                 minimum=1,
                                 maximum=5,
                                 value=pm.get_config("agent.max_attempts", 3),
                                 step=1,
-                                label="Tentativi Self-Healing"
-                            )
-                        ]
+                                label="Tentativi Self-Healing",
+                            ),
+                        ],
                     )
                 with gr.Column(scale=1):
+                    gr.Markdown("### LoRA")
+                    lora_dropdown = gr.Dropdown(
+                        choices=scan_lora_checkpoints(),
+                        label="Checkpoint",
+                    )
+                    with gr.Row():
+                        apply_lora_btn = gr.Button(
+                            "Applica LoRA", size="sm", variant="primary"
+                        )
+                        refresh_lora_btn = gr.Button("🔄", size="sm")
+                    lora_status_box = gr.Textbox(
+                        value=get_lora_status(),
+                        label="Stato",
+                        lines=1,
+                    )
                     gr.Markdown("### Prompt Library")
-                    lib_dropdown = gr.Dropdown(choices=prompt_library, label="Snippet Comuni")
+                    lib_dropdown = gr.Dropdown(
+                        choices=prompt_library, label="Snippet Comuni"
+                    )
                     lib_button = gr.Button("Usa Prompt")
 
                     gr.Markdown("### Technical Terms")
@@ -1082,21 +1758,37 @@ def launch_ui():
                     )
                     tag_cloud = gr.HTML(render_tag_cloud())
 
-                    selected_term = gr.Textbox(visible=False, elem_id="tech-term-picker")
-                    apply_term = gr.Button("Apply", visible=False, elem_id="tech-term-apply")
+                    selected_term = gr.Textbox(
+                        visible=False, elem_id="tech-term-picker"
+                    )
+                    apply_term = gr.Button(
+                        "Apply", visible=False, elem_id="tech-term-apply"
+                    )
 
                     term_search.change(
                         fn=render_tag_cloud, inputs=term_search, outputs=tag_cloud
                     )
                     apply_term.click(
-                        fn=lambda x: x, inputs=selected_term,
-                        outputs=chat_interface.textbox
+                        fn=lambda x: x,
+                        inputs=selected_term,
+                        outputs=chat_interface.textbox,
                     )
 
             def fill_prompt(choice):
                 return choice
 
-            lib_button.click(fn=fill_prompt, inputs=lib_dropdown, outputs=chat_interface.textbox)
+            lib_button.click(
+                fn=fill_prompt, inputs=lib_dropdown, outputs=chat_interface.textbox
+            )
+            apply_lora_btn.click(
+                fn=apply_lora,
+                inputs=[mode_radio, lora_dropdown],
+                outputs=lora_status_box,
+            )
+            refresh_lora_btn.click(
+                fn=refresh_lora_list,
+                outputs=lora_dropdown,
+            )
 
         def on_scrape_batch(selected):
             CTRL.reset()
@@ -1113,20 +1805,27 @@ def launch_ui():
 
             for s in predefined_sel:
                 if CTRL.cancelled:
-                    yield log_msg("ANNULLATO"); break
+                    yield log_msg("ANNULLATO")
+                    break
                 yield log_msg(f"Scraping: {s}")
-                yield from run_cmd_gen(f"python pipeline/c64_asm_scraper.py --sites {s} --delay 1.5")
+                yield from run_cmd_gen(
+                    f"python pipeline/c64_asm_scraper.py --sites {s} --delay 1.5"
+                )
 
             for s in custom_sel:
                 if CTRL.cancelled:
-                    yield log_msg("ANNULLATO"); break
+                    yield log_msg("ANNULLATO")
+                    break
                 yield log_msg(f"Scraping: {s['name']}")
                 yield log_msg("  Cerco PDF...")
                 yield from run_cmd_gen(f'python pipeline/scrape_docs.py "{s["url"]}"')
                 if CTRL.cancelled:
-                    yield log_msg("ANNULLATO"); break
+                    yield log_msg("ANNULLATO")
+                    break
                 yield log_msg("  Cerco codice Assembly...")
-                yield from run_cmd_gen(f'python pipeline/scrape_url.py "{s["url"]}" "{s["name"]}"')
+                yield from run_cmd_gen(
+                    f'python pipeline/scrape_url.py "{s["url"]}" "{s["name"]}"'
+                )
 
             if not CTRL.cancelled:
                 yield log_msg("Estrazione testo da PDF...")
@@ -1140,7 +1839,9 @@ def launch_ui():
                     for i, pdf_path in enumerate(pdfs):
                         tmp = f"data/output/raw_pdf{i}.txt"
                         yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
-                        yield from run_cmd_gen(f"python pipeline/pdf2text.py \"{pdf_path}\" \"{tmp}\"")
+                        yield from run_cmd_gen(
+                            f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                        )
                         if os.path.exists(tmp):
                             with open(tmp) as f:
                                 combined.append(f.read())
@@ -1149,9 +1850,13 @@ def launch_ui():
                         f.write("\n\n".join(combined))
                     yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
                     yield log_msg("Pulizia testo...")
-                    yield from run_cmd_gen("python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt")
+                    yield from run_cmd_gen(
+                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+                    )
                     yield log_msg("Generazione dataset...")
-                    yield from run_cmd_gen("python pipeline/build_dataset.py data data/output/dataset_unified.jsonl")
+                    yield from run_cmd_gen(
+                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                    )
                 else:
                     yield log_msg("Nessun PDF da processare.")
 
@@ -1177,7 +1882,9 @@ def launch_ui():
                         placeholder="https://...manuale.pdf  o  archive.org/details/...  o  https://drive.google.com/drive/folders/...",
                     )
                     with gr.Row():
-                        download_btn = gr.Button("Scarica URL", variant="primary", size="sm")
+                        download_btn = gr.Button(
+                            "Scarica URL", variant="primary", size="sm"
+                        )
 
                     gr.Markdown("## Scrapa Siti")
                     site_list = gr.CheckboxGroup(
@@ -1186,7 +1893,9 @@ def launch_ui():
                         value=[],
                     )
                     with gr.Row():
-                        scrape_btn = gr.Button("Scrapa Selezionati", variant="primary", size="sm")
+                        scrape_btn = gr.Button(
+                            "Scrapa Selezionati", variant="primary", size="sm"
+                        )
 
                     with gr.Row():
                         pause_btn = gr.Button("Pausa", size="sm")
@@ -1205,7 +1914,8 @@ def launch_ui():
                         for msg in download_and_integrate(url):
                             yield msg
                             if CTRL.cancelled:
-                                yield log_msg("ANNULLATO"); break
+                                yield log_msg("ANNULLATO")
+                                break
                         if not CTRL.cancelled:
                             yield log_msg("COMPLETATO")
                         CTRL.running = False
@@ -1215,14 +1925,10 @@ def launch_ui():
                             yield msg
 
                     download_btn.click(
-                        fn=on_download_only,
-                        inputs=url_input,
-                        outputs=main_log
+                        fn=on_download_only, inputs=url_input, outputs=main_log
                     )
                     scrape_btn.click(
-                        fn=on_scrape_only,
-                        inputs=site_list,
-                        outputs=main_log
+                        fn=on_scrape_only, inputs=site_list, outputs=main_log
                     )
                     pause_btn.click(fn=CTRL.pause, outputs=[], queue=False)
                     resume_btn.click(fn=CTRL.resume, outputs=[], queue=False)
@@ -1231,7 +1937,9 @@ def launch_ui():
                 with gr.Column(scale=1):
                     gr.Markdown("### Gestione siti")
                     new_name = gr.Textbox(label="Nome", placeholder="es. mio-sito-c64")
-                    new_url = gr.Textbox(label="URL", placeholder="https://nuovo-sito-c64.it/")
+                    new_url = gr.Textbox(
+                        label="URL", placeholder="https://nuovo-sito-c64.it/"
+                    )
                     add_btn = gr.Button("Aggiungi", size="sm")
                     add_msg = gr.Textbox(label="", lines=1)
                     del_dropdown = gr.Dropdown(
@@ -1243,26 +1951,40 @@ def launch_ui():
 
                     def on_add_site(name, url):
                         if not name or not url:
-                            return "Inserisci nome e URL.", gr.CheckboxGroup(choices=all_site_choices())
+                            return "Inserisci nome e URL.", gr.CheckboxGroup(
+                                choices=all_site_choices()
+                            )
                         save_custom_site(name.strip(), url.strip())
-                        return f"Sito '{name}' aggiunto!", gr.CheckboxGroup(choices=all_site_choices())
+                        return f"Sito '{name}' aggiunto!", gr.CheckboxGroup(
+                            choices=all_site_choices()
+                        )
 
                     def on_del_site(name):
                         if not name:
-                            return "Seleziona un sito da rimuovere.", gr.Dropdown(choices=[s["name"] for s in load_custom_sites()]), gr.CheckboxGroup(choices=all_site_choices())
+                            return (
+                                "Seleziona un sito da rimuovere.",
+                                gr.Dropdown(
+                                    choices=[s["name"] for s in load_custom_sites()]
+                                ),
+                                gr.CheckboxGroup(choices=all_site_choices()),
+                            )
                         remove_custom_site(name)
                         remaining = [s["name"] for s in load_custom_sites()]
-                        return f"Sito '{name}' rimosso!", gr.Dropdown(choices=remaining), gr.CheckboxGroup(choices=all_site_choices())
+                        return (
+                            f"Sito '{name}' rimosso!",
+                            gr.Dropdown(choices=remaining),
+                            gr.CheckboxGroup(choices=all_site_choices()),
+                        )
 
                     add_btn.click(
                         fn=on_add_site,
                         inputs=[new_name, new_url],
-                        outputs=[add_msg, site_list]
+                        outputs=[add_msg, site_list],
                     )
                     del_btn.click(
                         fn=on_del_site,
                         inputs=del_dropdown,
-                        outputs=[del_msg, del_dropdown, site_list]
+                        outputs=[del_msg, del_dropdown, site_list],
                     )
 
         with gr.Tab("Knowledge Base"):
@@ -1271,8 +1993,12 @@ def launch_ui():
 
             with gr.Row():
                 with gr.Column(scale=1):
-                    process_local_btn = gr.Button("📂 Processa Documenti Locali (data/input)", variant="primary")
-                    rebuild_btn = gr.Button("Ricostruisci solo Indice", variant="secondary")
+                    process_local_btn = gr.Button(
+                        "📂 Processa Documenti Locali (data/input)", variant="primary"
+                    )
+                    rebuild_btn = gr.Button(
+                        "Ricostruisci solo Indice", variant="secondary"
+                    )
 
                     process_local_btn.click(fn=on_process_local, outputs=kb_log)
                     rebuild_btn.click(fn=on_rebuild, outputs=kb_log)
@@ -1307,7 +2033,9 @@ def launch_ui():
                     dataset_query = gr.State("")
                     with gr.Row(equal_height=True):
                         prev_btn = gr.Button("◀ Precedente", min_width=120)
-                        dataset_btn = gr.Button("Visualizza Dataset", variant="primary", min_width=160)
+                        dataset_btn = gr.Button(
+                            "Visualizza Dataset", variant="primary", min_width=160
+                        )
                         next_btn = gr.Button("Successiva ▶", min_width=120)
                     with gr.Row():
                         ds_search = gr.Textbox(
@@ -1319,22 +2047,22 @@ def launch_ui():
                     ds_output = gr.HTML(label="Dataset")
                     dataset_btn.click(
                         fn=lambda: on_view_dataset(0, ""),
-                        outputs=[ds_output, dataset_page, dataset_query]
+                        outputs=[ds_output, dataset_page, dataset_query],
                     )
                     prev_btn.click(
                         fn=lambda p, q: on_view_dataset(int(p or 0) - 1, q),
                         inputs=[dataset_page, dataset_query],
-                        outputs=[ds_output, dataset_page, dataset_query]
+                        outputs=[ds_output, dataset_page, dataset_query],
                     )
                     next_btn.click(
                         fn=lambda p, q: on_view_dataset(int(p or 0) + 1, q),
                         inputs=[dataset_page, dataset_query],
-                        outputs=[ds_output, dataset_page, dataset_query]
+                        outputs=[ds_output, dataset_page, dataset_query],
                     )
                     ds_search_btn.click(
                         fn=lambda q: on_view_dataset(0, q),
                         inputs=ds_search,
-                        outputs=[ds_output, dataset_page, dataset_query]
+                        outputs=[ds_output, dataset_page, dataset_query],
                     )
 
                 with gr.Column(scale=1):
@@ -1343,7 +2071,205 @@ def launch_ui():
                     status_btn = gr.Button("Aggiorna")
                     status_btn.click(fn=on_status, outputs=info_log)
 
+        with gr.Tab("Distillazione"):
+            gr.Markdown("## Knowledge Distillation — Teacher → Student")
+            gr.Markdown(
+                "Genera un dataset sintetico di alta qualità usando un Teacher LLM, "
+                "poi addestra Qwen2.5-Coder-1.5B via LoRA. "
+                "Teacher predefinito: **OpenCode** (nessuna API key necessaria)."
+            )
+
+            # === Profili di Configurazione ===
+            gr.Markdown("### Profili di Configurazione")
+            gr.Markdown(
+                "Seleziona un profilo predefinito o personalizzato per impostare "
+                "automaticamente tutti i parametri. Crea nuovi profili con **Salva**."
+            )
+            with gr.Row():
+                profile_dropdown = gr.Dropdown(
+                    choices=get_all_profile_names(),
+                    value=get_all_profile_names()[0]
+                    if get_all_profile_names()
+                    else None,
+                    label="Profilo",
+                    interactive=True,
+                )
+                profile_save_name = gr.Textbox(
+                    label="Salva come...",
+                    placeholder="Nome nuovo profilo",
+                    scale=2,
+                )
+                profile_save_btn = gr.Button("💾 Salva", size="sm")
+                profile_delete_btn = gr.Button("🗑️ Elimina", size="sm")
+
+            with gr.Row():
+                with gr.Column(scale=2):
+                    gr.Markdown("### Configurazione Teacher")
+
+                    teacher_backend = gr.Dropdown(
+                        choices=[
+                            ("OpenCode (gratuito, built-in)", "opencode"),
+                            ("Groq (gratuito, veloce)", "groq"),
+                            ("OpenRouter (modelli vari)", "openrouter"),
+                            ("Ollama (locale)", "ollama"),
+                            ("HuggingFace Inference API", "huggingface"),
+                        ],
+                        value="opencode",
+                        label="Backend Teacher",
+                    )
+                    teacher_model = gr.Textbox(
+                        label="Modello Teacher (opzionale)",
+                        placeholder="es. qwen/qwen3-32b, llama3-70b-8192",
+                        value="",
+                    )
+                    teacher_api_key = gr.Textbox(
+                        label="API Key (solo per Groq/OpenRouter/HF)",
+                        placeholder="sk-... o lascia vuoto se usi .env",
+                        type="password",
+                        value="",
+                    )
+
+                    gr.Markdown("### Strategia di generazione")
+                    with gr.Row():
+                        type_checkboxes = gr.CheckboxGroup(
+                            choices=[
+                                ("Factual Q&A", "factual"),
+                                ("Code Generation", "code"),
+                                ("Code Explanation", "explain"),
+                                ("Bug Fixing", "bugfix"),
+                                ("Theory", "theory"),
+                            ],
+                            value=["factual", "code", "explain"],
+                            label="Tipi di dato",
+                        )
+                        lang_checkboxes = gr.CheckboxGroup(
+                            choices=[("Italiano", "it"), ("English", "en")],
+                            value=["it", "en"],
+                            label="Lingue",
+                        )
+                    with gr.Row():
+                        qa_per_chunk = gr.Slider(
+                            1, 5, value=2, step=1, label="QA per chunk"
+                        )
+                        max_chunks = gr.Slider(
+                            10, 500, value=50, step=10, label="Max chunks"
+                        )
+                    with gr.Accordion("Filtri qualità", open=False):
+                        min_output_len = gr.Slider(
+                            10, 200, value=20, step=5, label="Lunghezza minima risposta"
+                        )
+                        test_assembly = gr.Checkbox(
+                            label="Testa Assembly con ACME", value=True
+                        )
+                        test_basic = gr.Checkbox(
+                            label="Testa BASIC sintatticamente", value=True
+                        )
+
+                    with gr.Row():
+                        generate_btn = gr.Button(
+                            "🚀 Genera Dataset", variant="primary", size="sm"
+                        )
+                        placeholder_btn = gr.Button(
+                            "📄 Placeholder (1 esempio)", size="sm"
+                        )
+
+                with gr.Column(scale=2):
+                    gr.Markdown("### Training LoRA")
+                    train_dataset = gr.Textbox(
+                        label="Dataset path",
+                        value="data/output/distill_dataset.jsonl",
+                    )
+                    train_output = gr.Textbox(
+                        label="Output dir",
+                        value="data/models/c64-lora-pro",
+                    )
+                    train_seq_len = gr.Slider(
+                        512,
+                        4096,
+                        value=2048,
+                        step=256,
+                        label="Max sequence length",
+                    )
+                    train_btn = gr.Button(
+                        "🏋️ Addestra (LoRA)", variant="primary", size="sm"
+                    )
+
+                    gr.Markdown("### Stato")
+                    distill_status_btn = gr.Button("📊 Stato", size="sm")
+                    distill_log = gr.Textbox(label="Log", lines=20, max_lines=40)
+
+            # === Eventi Profili ===
+            profile_dropdown.change(
+                fn=on_distill_load_profile,
+                inputs=profile_dropdown,
+                outputs=[
+                    teacher_backend,
+                    teacher_model,
+                    teacher_api_key,
+                    type_checkboxes,
+                    lang_checkboxes,
+                    qa_per_chunk,
+                    max_chunks,
+                    min_output_len,
+                    test_assembly,
+                    test_basic,
+                ],
+            )
+            profile_save_btn.click(
+                fn=on_distill_save_profile,
+                inputs=[
+                    profile_save_name,
+                    teacher_backend,
+                    teacher_model,
+                    type_checkboxes,
+                    lang_checkboxes,
+                    qa_per_chunk,
+                    max_chunks,
+                    min_output_len,
+                    test_assembly,
+                    test_basic,
+                ],
+                outputs=[profile_dropdown, profile_save_name],
+            )
+            profile_delete_btn.click(
+                fn=on_distill_delete_profile,
+                inputs=profile_dropdown,
+                outputs=profile_dropdown,
+            )
+
+            # === Eventi Generazione / Training ===
+            generate_btn.click(
+                fn=on_distill_generate,
+                inputs=[
+                    teacher_backend,
+                    teacher_model,
+                    teacher_api_key,
+                    type_checkboxes,
+                    lang_checkboxes,
+                    qa_per_chunk,
+                    max_chunks,
+                    min_output_len,
+                    test_assembly,
+                    test_basic,
+                ],
+                outputs=distill_log,
+            )
+            placeholder_btn.click(
+                fn=on_distill_placeholder,
+                outputs=distill_log,
+            )
+            train_btn.click(
+                fn=on_distill_train,
+                inputs=[train_dataset, train_output, train_seq_len],
+                outputs=distill_log,
+            )
+            distill_status_btn.click(
+                fn=on_distill_status,
+                outputs=distill_log,
+            )
+
     demo.launch(server_name="0.0.0.0", theme=gr.themes.Soft())
+
 
 if __name__ == "__main__":
     launch_ui()
