@@ -34,7 +34,6 @@ services:
       - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      - MODEL_NAME=Qwen/Qwen2.5-Coder-1.5B-Instruct
       - OUTPUT_DIR=/app/data/models/c64-lora-pro
     deploy:
       resources:

@@ -10,21 +10,37 @@ from datasets import load_dataset, Dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
 )
 from peft import LoraConfig, PeftModel
 from trl import SFTTrainer, SFTConfig
 
 # =========================
-# CONFIG
+# CPU CHECK + CONFIG
 # =========================
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-Coder-1.5B-Instruct")
+IS_CPU = not torch.cuda.is_available()
+CPU_MAX_SEQ = 512
+default_max_seq = CPU_MAX_SEQ if IS_CPU else 2048
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-Coder-0.5B-Instruct")
 DATASET_PATH = (
     sys.argv[1] if len(sys.argv) > 1 else "./data/output/dataset_unified.jsonl"
 )
 VAL_DATASET_PATH = sys.argv[2] if len(sys.argv) > 2 else None
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data/models/c64-lora-pro")
-MAX_SEQ_LENGTH = int(os.getenv("MAX_SEQ_LENGTH", "2048"))
+MAX_SEQ_LENGTH = int(os.getenv("MAX_SEQ_LENGTH", str(default_max_seq)))
+
+if IS_CPU:
+    if MAX_SEQ_LENGTH > CPU_MAX_SEQ:
+        print(
+            f"⚠️  MAX_SEQ_LENGTH={MAX_SEQ_LENGTH} troppo alto per CPU, clamping a {CPU_MAX_SEQ}",
+            flush=True,
+        )
+        MAX_SEQ_LENGTH = CPU_MAX_SEQ
+    print("⚠️  RILEVATA CPU — training ottimizzato per CPU", flush=True)
+    print(f"   Modello: 0.5B | Seq length: {MAX_SEQ_LENGTH} | ~30-60s/step", flush=True)
+    print(
+        "   Per training GPU: MODEL_NAME=Qwen/Qwen2.5-Coder-1.5B-Instruct MAX_SEQ_LENGTH=2048",
+        flush=True,
+    )
 
 print(f"MODEL_NAME={MODEL_NAME}", flush=True)
 print(f"DATASET_PATH={DATASET_PATH}", flush=True)
@@ -63,20 +79,14 @@ try:
     tokenizer.padding_side = "right"
 
     # =========================
-    # LOAD MODEL (4-bit Quantization)
+    # LOAD MODEL
     # =========================
-    print("Caricamento modello in 4-bit...", flush=True)
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
+    print("Caricamento modello...", flush=True)
 
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
-        quantization_config=bnb_config,
-        device_map="auto",
+        torch_dtype=torch.float16,
+        device_map="cpu",
         trust_remote_code=True,
     )
 
@@ -120,11 +130,11 @@ try:
             flush=True,
         )
     else:
-        split = dataset.train_test_split(test_size=0.1, seed=42)
+        split = dataset.train_test_split(test_size=0.2, seed=42)
         dataset = split["train"]
         eval_dataset = split["test"]
         print(
-            f"Train: {len(dataset)} esempi | Val (auto-split 10%): {len(eval_dataset)} esempi",
+            f"Train: {len(dataset)} esempi | Val (auto-split 20%): {len(eval_dataset)} esempi",
             flush=True,
         )
 
@@ -133,23 +143,25 @@ try:
     # =========================
     print("Avvio training...", flush=True)
     training_args = SFTConfig(
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
-        gradient_accumulation_steps=4,
-        warmup_steps=10,
-        max_steps=200,
-        learning_rate=2e-4,
-        fp16=True,
+        use_cpu=IS_CPU,
+        per_device_train_batch_size=1 if IS_CPU else 2,
+        per_device_eval_batch_size=1 if IS_CPU else 2,
+        gradient_accumulation_steps=2,
+        warmup_steps=5 if IS_CPU else 10,
+        max_steps=100 if IS_CPU else 200,
+        learning_rate=1e-4 if IS_CPU else 2e-4,
+        fp16=False,
+        max_grad_norm=1.0,
         logging_steps=5,
-        eval_strategy="steps",
+        eval_strategy="no" if IS_CPU else "steps",
         eval_steps=20,
-        save_strategy="steps",
+        save_strategy="no" if IS_CPU else "steps",
         save_steps=20,
-        load_best_model_at_end=True,
+        load_best_model_at_end=not IS_CPU,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         output_dir=OUTPUT_DIR,
-        optim="paged_adamw_32bit",
+        optim="adamw_torch",
         report_to="none",
         max_length=MAX_SEQ_LENGTH,
         dataset_text_field="text",

@@ -33,7 +33,7 @@ L'agente esecutivo che scrive il codice:
 
 ### 2.4 ValidatorAgent (Analisi Statica e Compilazione)
 Garantisce la qualità del codice:
-- **Assembly**: Integra l'assembler ACME. Esegue check preventivi su branch fuori range (+/- 127 byte) e terminazione delle routine (RTS/JMP).
+- **Assembly**: Integra l'assembler ACME. Esegue check preventivi su branch fuori range (+/- 127 byte) e terminazione delle routine (RTS/JMP). Se il codice Assembly non inizia con una direttiva origine (`* =`), il validatore prepone automaticamente `* = $C000` per evitare l'errore ACME "Program counter undefined".
 - **BASIC v2**: Parser interno per:
     - Numeri di riga sequenziali.
     - Collisioni di variabili (considera solo i primi 2 caratteri, es. `SCORE1` vs `SCORE2`).
@@ -82,6 +82,7 @@ Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tec
 - **Vault Obsidian**: La documentazione è strutturata in Markdown (9 manuali: `vic2_registers.md`, `raster_interrupts.md`, `sprite_programming.md`, `sid_programming.md`, `kernal_routines.md`, `6502_addressing_modes.md`, `c64_screen_routines.md`, `c64_basic_tutorial.md`, `c64_memory_map.md`) con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
 - **Pipeline**: Include strumenti di pulizia per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
+- **Esclusione OCR**: I file `data/output/*.txt` (estrazioni OCR raw/clean) NON vengono più indicizzati — causavano allucinazioni. Solo i `.md` curati in `knowledge_base/` sono usati per la RAG.
 
 ---
 
@@ -227,13 +228,24 @@ Knowledge Base (*.md)
 
 ### 6.4 Training LoRA
 
-Il training (pipeline/train_lora.py) usa:
-- **Modello base**: Qwen2.5-Coder-1.5B-Instruct
-- **LoRA**: r=16, alpha=32, target modules: q_proj, k_proj, v_proj, o_proj
-- **Validation**: 10% split automatico con eval every `eval_steps` (default: 10% del training set)
-- **Early stopping**: `load_best_model_at_end=True`, metrica `eval_loss`
-- **Sequenza massima**: 2048 token (configurabile in UI fino a 4096)
+Il training (pipeline/train_lora.py) si adatta automaticamente a CPU o GPU:
+
+#### CPU (default per ambiente senza GPU)
+- **Modello base**: Qwen/Qwen2.5-Coder-0.5B-Instruct (pre-downloadato nell'immagine Docker)
+- **LoRA**: r=16, alpha=32, target modules: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+- **Max length**: 512 token (clampato automaticamente se la UI passa valori > 512 su CPU)
+- **Batch**: per_device_train_batch_size=1, gradient_accumulation_steps=2
+- **Learning rate**: 1e-4 (ridotto per stabilità su dataset piccolo)
+- **Gradient clipping**: max_grad_norm=1.0
+- **Evaluation**: disabilitato su CPU (`eval_strategy="no"`, `save_strategy="no"`) per velocità
 - **Output**: checkpoint LoRA salvati in `data/models/c64-lora-pro/`
+
+#### GPU (se CUDA disponibile)
+- **Modello base**: Qwen/Qwen2.5-Coder-1.5B-Instruct
+- **Max length**: 2048 token (configurabile in UI fino a 4096)
+- **Batch**: per_device_train_batch_size=2, gradient_accumulation_steps=2
+- **Learning rate**: 2e-4
+- **Evaluation**: abilitato con validation split 20%
 
 ### 6.5 Profili di Configurazione
 

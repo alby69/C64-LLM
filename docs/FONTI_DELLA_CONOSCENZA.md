@@ -11,7 +11,6 @@ Quando la RAG è attiva, il sistema cerca i chunk più rilevanti in un indice FA
 | Directory | Contenuto | Quanti |
 |-----------|-----------|--------|
 | `knowledge_base/*.md` | Manuali scritti a mano: memory map, VIC-II, SID, sprite, raster, KERNAL, BASIC tutorial, indirizzamenti 6502, routine schermo, CIA | 9 file |
-| `data/output/*_clean.txt` | Libri tecnici puliti (C64 Programmer's Reference Guide, Mapping the C64, 6502 Assembly Language, ecc.) | 76+ file |
 | `data/input/*.bas.txt` | Programmi BASIC v2 estratti da D64/G64/PRG | vari |
 | `data/input/*.ml.txt` | Codice machine language estratto | vari |
 | `data/src/*.asm` | Assembly 6502 scaricato da siti (Codebase64, 6502.org, ecc.) | vari |
@@ -75,7 +74,7 @@ Domanda utente
 │  2. Language detection (Qwen)                  │
 │  3. HyDE — risposta ipotetica (Qwen, opz.)     │
 │  4. FAISS similarity search sui chunk della KB │
-│     (knowledge_base/ + data/output/ + ...)     │
+│     (knowledge_base/ + data/ + docs/)          │
 └────────────────────┬───────────────────────────┘
                      │ contesto tecnico (chunk rilevanti)
                      ▼
@@ -117,7 +116,10 @@ Domanda utente
 
 Qwen **non** è fine-tunato di base sul C64. La conoscenza tecnica arriva interamente dai chunk della Knowledge Base iniettati nel contesto del prompt (RAG). Se la RAG è disattivata, Qwen risponde solo con la sua conoscenza pre-training, che per un modello piccolo (1.5B) è molto limitata su temi C64.
 
-Il training LoRA opzionale (`pipeline/train_lora.py`) addestra Qwen su `dataset_unified.jsonl` (derivato dagli stessi libri), producendo pesi specializzati in `data/models/c64-lora-pro/`.
+Il training LoRA opzionale (`pipeline/train_lora.py`) addestra Qwen su `distill_dataset.jsonl`, producendo pesi specializzati in `data/models/c64-lora-pro/`. Il training rileva automaticamente CPU vs GPU: su CPU usa il modello 0.5B con `max_length=512`; su GPU usa il modello 1.5B con `max_length=2048`.
+
+#### Nota: esclusione di `data/output/*.txt` dalla KB
+I file di testo estratti da PDF (`data/output/*_raw.txt`, `data/output/*_clean.txt`) sono stati esclusi dall'indice FAISS a giugno 2026. Questi file contenevano artefatti OCR che causavano allucinazioni (es. il modello suggeriva `$0314` invece di `$D020` per il colore del bordo). I `.md` curati in `knowledge_base/` sono sufficienti e più accurati.
 
 ---
 

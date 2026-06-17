@@ -2186,9 +2186,9 @@ def launch_ui():
                     train_seq_len = gr.Slider(
                         512,
                         4096,
-                        value=2048,
+                        value=512,
                         step=256,
-                        label="Max sequence length",
+                        label="Max sequence length (512 per CPU, 2048+ per GPU)",
                     )
                     train_btn = gr.Button(
                         "🏋️ Addestra (LoRA)", variant="primary", size="sm"

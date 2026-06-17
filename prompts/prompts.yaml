@@ -31,6 +31,8 @@ coder:
 
       Per Assembly 6502:
       - Usa sintassi standard ACME.
+      - INIZIA SEMPRE il codice con "* = $0801" (per programmi BASIC-SYS) o "* = $C000" (per codice macchina puro).
+        Senza questa direttiva, l'assembler ACME fallisce con "Program counter undefined".
       - Istruzioni comuni: LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TXA, TYA, TSX, TXS,
         PHA, PLA, PHP, PLP, JMP, JSR, RTS, BEQ, BNE, BCC, BCS, BPL, BMI, BVC, BVS,
         CMP, CPX, CPY, BIT, AND, ORA, EOR, LSR, ASL, ROL, ROR, INX, INY, DEX, DEY,

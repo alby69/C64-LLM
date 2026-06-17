@@ -22,7 +22,8 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 
 ### Requisiti
 - Python 3.10+
-- [ACME Assembler](https://github.com/meonwax/acme) (per la validazione del codice)
+- ACME Assembler (per la validazione del codice, già installato nell'immagine Docker)
+  - Su host: `apt install acme` (Debian/Ubuntu) o `brew install acme` (macOS)
 
 ### Setup
 ```bash
@@ -78,6 +79,13 @@ INPUT_PDF=mio_documento.pdf docker compose up c64-pipeline
 docker compose up c64-train
 ```
 Il modello addestrato verrà salvato in `./data/models/c64-lora-pro/`.
+
+#### Note per CPU:
+- Il training rileva automaticamente la CPU e usa il modello `Qwen/Qwen2.5-Coder-0.5B-Instruct`
+- `max_length=512`, `batch_size=1`, `gradient_accumulation_steps=2`
+- Evaluation e salvataggio checkpoint disabilitati per velocità
+- Gradient clipping (`max_grad_norm=1.0`) e learning rate ridotto (`1e-4`) per stabilità
+- Default UI: `Max sequence length` = 512 (regolabile fino a 4096 per GPU)
 
 ### Altri comandi utili
 ```bash
@@ -142,6 +150,8 @@ docker compose restart c64-ui
   ---
   Contenuto...
   ```
+
+**Nota importante**: I file `.txt` in `data/output/` (estrazioni OCR da PDF) NON vengono più inclusi nell'indice FAISS — contenevano artefatti OCR che causavano allucinazioni. Solo i file `.md` curati in `knowledge_base/` vengono indicizzati.
 
 ## 🧠 Knowledge Distillation
 

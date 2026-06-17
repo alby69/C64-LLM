@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     gcc \
     build-essential \
+    acme \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -17,6 +18,14 @@ RUN mkdir -p data/input data/output data/tmp data/models data/src data/vectorsto
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download del modello LoRA (0.5B) per training CPU immediato
+RUN python -c "\
+from transformers import AutoModelForCausalLM, AutoTokenizer; \
+AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-Coder-0.5B-Instruct'); \
+AutoTokenizer.from_pretrained('Qwen/Qwen2.5-Coder-0.5B-Instruct'); \
+print('✅ Modello 0.5B pre-scaricato'); \
+"
 
 COPY . .
 

@@ -35,7 +35,7 @@ DOPO (RAG + LoRA):
 
 | File | Modifica |
 |------|----------|
-| `pipeline/train_lora.py` | Validation split automatico, eval_strategy, max_seq_length=2048, load_best_model_at_end |
+| `pipeline/train_lora.py` | Rilevamento automatico CPU/GPU, SFTConfig, gradient clipping, eval/save disabilitati su CPU, validation split 20% |
 | `config/agent_config.yaml` | Aggiunta sezione `teacher:` |
 | `run_pipeline.py` | Aggiunto step `04_distillation` |
 
@@ -65,19 +65,21 @@ teacher:
     languages: ["it", "en"]
 ```
 
-## 4. Student: Qwen2.5-Coder-1.5B-Instruct
+## 4. Student: Qwen2.5-Coder (CPU/GPU automatico)
 
-| Parametro | Valore |
-|-----------|--------|
-| Modello base | `Qwen/Qwen2.5-Coder-1.5B-Instruct` |
-| Tecnica | LoRA (r=16, alpha=32, dropout=0.05) |
-| Quantizzazione | 4-bit NF4 |
-| Max seq length | 2048 (default, configurabile fino a 4096) |
-| Batch | 2 per device, gradient accumulation 4 (effective batch 8) |
-| Ottimizzatore | paged_adamw_32bit |
-| Training | 200 step max, eval ogni 20 step, save ogni 20 step |
-| Validation | 10% auto-split con load_best_model_at_end |
-| Output | `data/models/c64-lora-pro/` |
+| Parametro | CPU | GPU |
+|-----------|-----|-----|
+| Modello base | `Qwen/Qwen2.5-Coder-0.5B-Instruct` | `Qwen/Qwen2.5-Coder-1.5B-Instruct` |
+| Tecnica | LoRA (r=16, alpha=32, dropout=0.05) | LoRA (r=16, alpha=32, dropout=0.05) |
+| Quantizzazione | float16 (no 4-bit, incompatibile con CPU training) | 4-bit NF4 |
+| Max seq length | 512 (clampato automaticamente) | 2048 (configurabile fino a 4096) |
+| Batch | 1 per device, accum 2 | 2 per device, accum 4 |
+| Learning rate | 1e-4 | 2e-4 |
+| Gradient clipping | max_grad_norm=1.0 | — |
+| Ottimizzatore | adamw_torch | paged_adamw_32bit |
+| Training | 100 step max, no eval/save | 200 step max, eval/save ogni 20 |
+| Validation | 20% auto-split (solo per logging) | 10% auto-split con load_best_model_at_end |
+| Output | `data/models/c64-lora-pro/` | `data/models/c64-lora-pro/` |
 
 ## 5. Dataset generato (Teacher = OpenCode)
 
@@ -117,10 +119,10 @@ python pipeline/train_lora.py data/output/distill_dataset.jsonl
 ```
 
 Il training:
-1. Carica Qwen2.5-Coder-1.5B-Instruct in 4-bit
+1. Rileva automaticamente CPU (modello 0.5B) o GPU (modello 1.5B)
 2. Applica LoRA (r=16)
-3. Suddivide automaticamente 90% train / 10% validation
-4. Addestra per 1000 step, salvando il miglior checkpoint
+3. Suddivide automaticamente 80% train / 20% validation
+4. Addestra per 100 step (CPU) o 200 step (GPU), senza eval/save su CPU per velocità
 5. Salva in `data/models/c64-lora-pro/`
 
 ### Generare più dati con Teacher automatico

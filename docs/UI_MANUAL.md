@@ -89,10 +89,11 @@ Gestione dell'indice vettoriale FAISS e navigazione dei file sorgente.
 Pulsante **Ricostruisci Indice KB** — ricostruisce l'indice FAISS da zero leggendo:
 
 - `knowledge_base/*.md` — tutorial e documentazione con frontmatter
-- `data/output/clean.txt` — testo pulito dalla pipeline
 - `data/input/*.bas.txt` — BASIC detokenizzato
 - `data/input/*.ml.txt` — codice macchina estratto
 - `data/src/*.asm` — Assembly scrapato dal web
+
+**Nota**: I file `data/output/*.txt` (estrazioni OCR da PDF) NON vengono più indicizzati dalla KB — causavano allucinazioni tecniche nel modello.
 
 Lo splitter usa `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)` con separatori `["\\n\\n", "\\n", ".", " ", ""]`.
 
@@ -179,7 +180,7 @@ Il sistema a profili permette di salvare e ripristinare configurazioni complete 
 |----------|-------------|
 | **Dataset path** | Textbox con il path del dataset JSONL generato (default: `data/output/distill_dataset.jsonl`) |
 | **Output dir** | Textbox con la directory di output per i checkpoint LoRA (default: `data/models/c64-lora-pro`) |
-| **Max sequence length** | Slider 512-4096: lunghezza massima delle sequenze in token (default: 2048) |
+| **Max sequence length** | Slider 512-4096: lunghezza massima delle sequenze in token (default: 512 per CPU, 2048+ per GPU) |
 | **🏋️ Addestra (LoRA)** | Pulsante per avviare il training LoRA. Mostra log in tempo reale nella textbox "Log". |
 
 ### Stato
