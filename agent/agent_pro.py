@@ -709,16 +709,39 @@ def download_and_integrate(url):
 
 
 def on_rebuild():
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
     try:
         kb = C64KnowledgeBase()
-        old_stdout = sys.stdout
-        sys.stdout = StringIO()
         kb.build_index()
         out = sys.stdout.getvalue()
-        sys.stdout = old_stdout
         return out + "\n[OK] KB ricostruita."
     except Exception as e:
         return f"[ERRORE] {e}"
+    finally:
+        sys.stdout = old_stdout
+
+def on_process_local():
+    """Processa tutti i documenti in data/input e ricostruisce la KB."""
+    try:
+        from pipeline.process_batch import process_all_pdfs
+        yield log_msg("Avvio elaborazione documenti locali in data/input...")
+
+        process_all_pdfs(["data/input"], "data/output")
+        yield log_msg("Elaborazione PDF completata. Ricostruisco l'indice...")
+
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        try:
+            kb = C64KnowledgeBase()
+            kb.build_index()
+            out = sys.stdout.getvalue()
+            yield out + "\n" + log_msg("✅ Elaborazione locale completata e KB aggiornata!")
+        finally:
+            sys.stdout = old_stdout
+
+    except Exception as e:
+        yield log_msg(f"❌ ERRORE durante l'elaborazione: {e}")
 
 
 KB_DIRS = [
@@ -997,7 +1020,23 @@ def render_tag_cloud(query=""):
     return "\n".join(html_parts)
 
 
+def bootstrap():
+    """Crea le cartelle necessarie se non esistono."""
+    dirs = [
+        "data/input",
+        "data/output",
+        "data/tmp",
+        "data/models",
+        "data/src",
+        "data/vectorstore",
+        "knowledge_base"
+    ]
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+    print(f"Bootstrap completato: {len(dirs)} cartelle verificate/create.")
+
 def launch_ui():
+    bootstrap()
     lora = os.environ.get("LORA_PATH")
     gguf = os.environ.get("GGUF_MODEL_PATH")
 
@@ -1232,7 +1271,10 @@ def launch_ui():
 
             with gr.Row():
                 with gr.Column(scale=1):
-                    rebuild_btn = gr.Button("Ricostruisci Indice KB", variant="primary")
+                    process_local_btn = gr.Button("📂 Processa Documenti Locali (data/input)", variant="primary")
+                    rebuild_btn = gr.Button("Ricostruisci solo Indice", variant="secondary")
+
+                    process_local_btn.click(fn=on_process_local, outputs=kb_log)
                     rebuild_btn.click(fn=on_rebuild, outputs=kb_log)
 
                 with gr.Column(scale=2):
