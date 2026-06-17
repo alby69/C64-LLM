@@ -29,14 +29,14 @@ class C64KnowledgeBase:
 
         # Markdown con parsing frontmatter
         for root, _, files in os.walk(self.kb_path):
-            for file in files:
-                if not file.endswith(".md"):
+            for fname in files:
+                if not fname.endswith(".md"):
                     continue
-                path = os.path.join(root, file)
+                path = os.path.join(root, fname)
                 try:
                     with open(path, 'r', encoding="utf-8", errors="replace") as f:
                         post = frontmatter.load(f)
-                    content = post.content
+                    content = f"Source: {fname}\n\n" + post.content
                     if post.metadata:
                         tags = post.metadata.get('tags', [])
                         if isinstance(tags, list):
@@ -48,14 +48,40 @@ class C64KnowledgeBase:
                     print(f"  Skipping {path}: {e}")
 
         # Cleaned text from pipeline
-        clean_txt = "data/output/clean.txt"
-        if os.path.exists(clean_txt):
-            try:
-                with open(clean_txt, encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-                documents.append(Document(page_content=content, metadata={"source": clean_txt}))
-            except Exception as e:
-                print(f"  Skipping {clean_txt}: {e}")
+        clean_dir = "data/output"
+        if os.path.exists(clean_dir):
+            for root, _, files in os.walk(clean_dir):
+                for fname in files:
+                    if fname.endswith(".txt"):
+                        path = os.path.join(root, fname)
+                        try:
+                            with open(path, encoding="utf-8", errors="replace") as f:
+                                content = f.read()
+                            # Prepend title/filename to content to improve retrieval
+                            content = f"Document: {fname}\n\n" + content
+                            documents.append(Document(page_content=content, metadata={"source": path}))
+                        except Exception as e:
+                            print(f"  Skipping {path}: {e}")
+
+        # Integration of documentation from docs/
+        docs_internal = "docs"
+        if os.path.exists(docs_internal):
+            for root, _, files in os.walk(docs_internal):
+                for fname in files:
+                    if fname.endswith(".md"):
+                        path = os.path.join(root, fname)
+                        try:
+                            with open(path, encoding="utf-8", errors="replace") as f:
+                                post = frontmatter.load(f)
+                            content = post.content
+                            # Prepend filename
+                            content = f"Internal Document: {fname}\n\n" + content
+                            if post.metadata:
+                                content += "\nMetadata: " + str(post.metadata)
+                            documents.append(Document(page_content=content, metadata={"source": path, **post.metadata}))
+                        except Exception as e:
+                            print(f"  Skipping {path}: {e}")
+
 
         # BASIC extracted from D64/G64 and ML dumps
         input_dir = "data/input"
@@ -92,7 +118,7 @@ class C64KnowledgeBase:
                             print(f"  Skipping {path}: {e}")
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500, chunk_overlap=150,
+            chunk_size=1000, chunk_overlap=100,
             separators=["\n\n", "\n", ".", " ", ""]
         )
         docs = text_splitter.split_documents(documents)

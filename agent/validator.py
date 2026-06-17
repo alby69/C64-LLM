@@ -144,5 +144,10 @@ class ValidatorAgent:
                 all_logs.append(log)
 
         if all_success:
+            # Check if these are basic linters
+            if any(isinstance(l, BasicSyntaxLinter) for l in linters):
+                return True, "Validazione BASIC passata."
+            if any(isinstance(l, AssemblyBranchLinter) for l in linters):
+                return True, "Validazione Assembly passata."
             return True, "Validazione passata."
         return False, "Errori riscontrati:\n" + "\n".join(all_logs)
