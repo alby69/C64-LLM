@@ -96,6 +96,7 @@ class C64KnowledgeBase:
                         try:
                             with open(path, encoding="utf-8", errors="replace") as f:
                                 content = f.read()
+                            content = f"Source Code: {fname}\n\n" + content
                             documents.append(Document(page_content=content, metadata={"source": path}))
                         except Exception as e:
                             print(f"  Skipping {path}: {e}")
@@ -113,6 +114,7 @@ class C64KnowledgeBase:
                         try:
                             with open(path, encoding="utf-8", errors="replace") as f:
                                 content = f.read()
+                            content = f"Assembly Source: {fname}\n\n" + content
                             documents.append(Document(page_content=content, metadata={"source": path}))
                         except Exception as e:
                             print(f"  Skipping {path}: {e}")

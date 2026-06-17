@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Assicura la creazione delle cartelle persistenti/data
+RUN mkdir -p data/input data/output data/tmp data/models data/src data/vectorstore knowledge_base
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
