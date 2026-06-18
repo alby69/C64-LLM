@@ -200,7 +200,7 @@ class C64CodingAgent:
     def active_lora(self):
         return self._current_lora
 
-    def chat_wrapper(self, message, history, mode, auto_scrape, max_attempts):
+    def chat_wrapper(self, message, history, mode, auto_scrape):
         use_rag = mode in ("RAG", "RAG+LoRA")
         formatted_history: list[tuple[str, str]] = []
         for item in history:
@@ -212,18 +212,13 @@ class C64CodingAgent:
                 formatted_history.append((str(item), ""))
 
         try:
+            max_attempts = int(self.pm.get_config("agent.max_attempts", 3))
             response, sources, logs = self.orchestrator.process_request(
                 message,
                 use_rag=use_rag,
                 chat_history=formatted_history,
-                max_attempts=int(max_attempts),
+                max_attempts=max_attempts,
             )
-
-            source_text = ""
-            if sources:
-                source_text = "\n\n**Fonti consultate:**\n" + "\n".join(
-                    [f"- {s}" for s in set(sources)]
-                )
 
             log_text = ""
             if logs:
@@ -233,7 +228,7 @@ class C64CodingAgent:
                     + "\n</details>"
                 )
 
-            base = response + source_text + log_text
+            base = response + log_text
             yield base
 
             if not auto_scrape:
@@ -284,6 +279,56 @@ class C64CodingAgent:
 
         except Exception as e:
             yield f"Errore durante l'elaborazione: {str(e)}"
+
+
+def get_hints(message):
+    if not message:
+        return ""
+    m = message.lower()
+    hints = []
+
+    if any(kw in m for kw in ["bordo", "border", "$d020", "d020", "colore bordo", "colore dello sfondo", "$d021", "d021", "53280", "53281", "colore", "color"]):
+        hints.append("""**🎨 Colori C64 (0-15)**
+0=Nero 1=Bianco 2=Rosso 3=Ciano
+4=Viola 5=Verde 6=Blu 7=Giallo
+8=Arancione 9=Marrone 10=Rosa 11=Grigio scuro
+12=Grigio medio 13=Verde chiaro 14=Azzurro 15=Grigio chiaro
+`$D020`(53280)=bordo `$D021`(53281)=sfondo""")
+
+    if any(kw in m for kw in ["sprite", "sprite 0", "sprite 1"]):
+        hints.append("""**🟦 Registri Sprite VIC-II**
+$D015 = enable, $D000-$D00F = X/Y (8 sprite),
+$D010 = MSB X, $D027-$D02E = colore,
+$D017 = expand Y, $D01D = expand X,
+$D01C = multicolor, $07F8-$07FF = pointer""")
+
+    if any(kw in m for kw in ["raster", "raster interrupt", "irq", "$d012", "d012"]):
+        hints.append("""**⚡ Raster Interrupt**
+$D012 = linea raster confronto, $D01A = IRQ mask (bit 0),
+$0314/$0315 = vettore IRQ (ROM), $FFFE/$FFFF = vettore NMI
+`SEI` / `CLI` = disabilita/abilita interrupt""")
+
+    if any(kw in m for kw in ["sid", "musica", "suono", "audio", "$d400", "d400", "psid"]):
+        hints.append("""**🔊 SID 6581 ( $D400-$D418 )**
+$D400-$D401 = freq voice 1, $D402-$D403 = pulse width,
+$D404 = controllo (gate/test/ring/sync/rect/saw/tri/noise),
+$D405-$D406 = ADSR, $D40B-$D40C = freq voice 2,
+$D412-$D413 = ADSR voice 2, $D415 = filtro cutoff low,
+$D418 = volume + filtro""")
+
+    if any(kw in m for kw in ["joystick", "joy", "cia", "$dc00", "dc00", "$dc01", "dc01"]):
+        hints.append("""**🎮 CIA 1 — Joystick & Keyboard**
+$DC00 = porta A (joystick 1 / colonne tastiera),
+$DC01 = porta B (joystick 2 / righe tastiera)
+Bits: 0=up, 1=down, 2=left, 3=right, 4=fire""")
+
+    if any(kw in m for kw in ["kernal", "kernal routine", "$ffe0", "chrout", "ffd2", "$ffd2"]):
+        hints.append("""**💾 KERNAL Routines principali**
+$FFD2 = CHROUT (scrive un carattere), $FFE4 = GETIN (legge tastiera),
+$FFCF = PLOT (get/set cursore), $FF81 = screen editor init,
+$FF5B = SETLFS, $FFBD = SETNAM, $FFD5 = LOAD, $FFD8 = SAVE""")
+
+    return "\n\n".join(hints)
 
 
 def log_msg(msg):
@@ -1721,13 +1766,6 @@ def launch_ui():
                                 label="Auto-elabora link (aggiungi siti + pipeline)",
                                 value=False,
                             ),
-                            max_attempts_slider := gr.Slider(
-                                minimum=1,
-                                maximum=5,
-                                value=pm.get_config("agent.max_attempts", 3),
-                                step=1,
-                                label="Tentativi Self-Healing",
-                            ),
                         ],
                     )
                 with gr.Column(scale=1):
@@ -1746,6 +1784,12 @@ def launch_ui():
                         label="Stato",
                         lines=1,
                     )
+
+                    hints_md = gr.Markdown(
+                        value="",
+                        label="Riferimenti",
+                    )
+
                     gr.Markdown("### Prompt Library")
                     lib_dropdown = gr.Dropdown(
                         choices=prompt_library, label="Snippet Comuni"
@@ -1788,6 +1832,10 @@ def launch_ui():
             refresh_lora_btn.click(
                 fn=refresh_lora_list,
                 outputs=lora_dropdown,
+            )
+
+            chat_interface.textbox.submit(
+                fn=get_hints, inputs=chat_interface.textbox, outputs=hints_md
             )
 
         def on_scrape_batch(selected):
