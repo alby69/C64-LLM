@@ -1622,7 +1622,7 @@ def render_wiki_graph_svg(selected_node=None):
     if len(raw_nodes) == 0:
         return "<p style='color:#888'>Nessun nodo nel grafo.</p>"
 
-    pos = nx.spring_layout(G, k=2.5, iterations=50, seed=42)
+    pos = nx.kamada_kawai_layout(G)
 
     xs = [p[0] for p in pos.values()]
     ys = [p[1] for p in pos.values()]
@@ -1633,23 +1633,28 @@ def render_wiki_graph_svg(selected_node=None):
         rx = 1
     if ry == 0:
         ry = 1
-    W, H = 900, 600
-    margin = 60
-    s = min((W - 2 * margin) / rx, (H - 2 * margin) / ry) * 0.85
+    W, H = 960, 640
+    margin = 80
+    s = min((W - 2 * margin) / rx, (H - 2 * margin) / ry) * 0.9
     cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
 
     def to_svg_coord(x, y):
         return (W / 2 + (x - cx) * s, H / 2 + (y - cy) * s)
 
-    # Build node data JSON for JS
     node_data = []
-    for nid, (x, y) in pos.items():
+    seen_ids = {}
+    for nid in pos:
+        if nid in seen_ids:
+            continue
+        seen_ids[nid] = True
+        x, y = pos[nid]
         node = node_map.get(nid, {})
         cat = node.get("category", "concetto")
+        sx, sy = to_svg_coord(x, y)
         node_data.append({
             "id": nid, "label": node.get("label", nid),
             "cat": cat, "desc": node.get("description", ""),
-            "x": to_svg_coord(x, y)[0], "y": to_svg_coord(x, y)[1],
+            "x": round(sx, 1), "y": round(sy, 1),
             "color": colors.get(cat, "#888"),
         })
     edge_data = []
@@ -1657,50 +1662,85 @@ def render_wiki_graph_svg(selected_node=None):
         if e["from"] in pos and e["to"] in pos:
             edge_data.append({"from": e["from"], "to": e["to"], "label": e.get("label", "")})
 
+    node_json = _json.dumps(node_data, ensure_ascii=False)
+
     html_parts = []
-    html_parts.append('<div style="position:relative">')
-    html_parts.append(f'<svg id="wikigrafosvg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">')
+    html_parts.append('<div id="wiki-pan">')
+    html_parts.append(f'<svg id="wikigrafosvg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" style="cursor:grab;background:#1a1a2e;border-radius:8px">')
     html_parts.append(f'<rect width="{W}" height="{H}" fill="#1a1a2e" rx="8"/>')
     for ed in edge_data:
-        x1 = next(n["x"] for n in node_data if n["id"] == ed["from"])
-        y1 = next(n["y"] for n in node_data if n["id"] == ed["from"])
-        x2 = next(n["x"] for n in node_data if n["id"] == ed["to"])
-        y2 = next(n["y"] for n in node_data if n["id"] == ed["to"])
-        html_parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#555" stroke-width="1.5"/>')
+        f = next((n for n in node_data if n["id"] == ed["from"]), None)
+        t = next((n for n in node_data if n["id"] == ed["to"]), None)
+        if not f or not t:
+            continue
+        html_parts.append(f'<line x1="{f["x"]}" y1="{f["y"]}" x2="{t["x"]}" y2="{t["y"]}" stroke="#555" stroke-width="1.5"/>')
         if ed["label"]:
-            html_parts.append(f'<text x="{(x1+x2)/2:.1f}" y="{(y1+y2)/2-6:.1f}" fill="#888" font-size="9" text-anchor="middle">{ed["label"]}</text>')
+            html_parts.append(f'<text x="{(f["x"]+t["x"])/2:.1f}" y="{(f["y"]+t["y"])/2-6:.1f}" fill="#888" font-size="9" text-anchor="middle">{ed["label"]}</text>')
     for nd in node_data:
-        r = 7
+        r = 7 if nd["cat"] != "chip" else 10
         html_parts.append(
-            f'<g style="cursor:pointer" onclick="showNode(\'{nd["id"]}\')" '
-            f'onmouseover="this.querySelector(\'circle\').setAttribute(\'stroke-width\',\'3\')" '
-            f'onmouseout="this.querySelector(\'circle\').setAttribute(\'stroke-width\',\'1.5\')">'
-            f'<circle cx="{nd["x"]:.1f}" cy="{nd["y"]:.1f}" r="{r}" fill="{nd["color"]}" '
-            f'stroke="#fff" stroke-width="1.5"/>'
-            f'<text x="{nd["x"]:.1f}" y="{nd["y"]+r+11}" fill="#eee" font-size="9" '
+            f'<g class="wikig-node" data-id="{nd["id"]}" style="cursor:pointer">'
+            f'<circle cx="{nd["x"]}" cy="{nd["y"]}" r="{r}" fill="{nd["color"]}" stroke="#fff" stroke-width="1.5"/>'
+            f'<text x="{nd["x"]}" y="{nd["y"]+r+10}" fill="#eee" font-size="9" '
             f'text-anchor="middle" font-family="monospace">{nd["label"]}</text></g>'
         )
     html_parts.append('</svg>')
     html_parts.append('</div>')
     html_parts.append(f'<div id="wikidesc" style="margin-top:8px;padding:12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:50px;color:#ccc;font-size:14px">Clicca un nodo per vedere la descrizione.</div>')
 
-    node_json = _json.dumps(node_data, ensure_ascii=False)
-    hl_node = ""
+    hl = ""
     if selected_node:
-        hl_node = f'setTimeout(function(){{showNode("{selected_node}");}},100);'
+        hl = f'setTimeout(function(){{showNode("{selected_node}");}},100);'
 
     html_parts.append(f'''<script>
 var NODES = {node_json};
 function showNode(id){{
     var n = NODES.find(function(x){{return x.id==id;}});
     if(!n) return;
-    var desc = n.desc || '';
     document.getElementById('wikidesc').innerHTML =
-        '<b style="color:#88ccff;font-size:16px">' + n.label + '</b><br>' +
-        '<span style="color:#aaa;font-size:12px">' + n.cat + '</span><br>' +
-        '<span style="color:#ddd">' + desc + '</span>';
+        '<b style=\"color:#88ccff;font-size:16px\">' + n.label + '</b><br>' +
+        '<span style=\"color:#aaa;font-size:12px\">' + n.cat + '</span><br>' +
+        '<span style=\"color:#ddd\">' + n.desc + '</span>';
 }}
-{hl_node}
+document.querySelectorAll('#wikigrafosvg g[data-id]').forEach(function(g){{
+    g.addEventListener('click',function(){{showNode(this.getAttribute('data-id'));}});
+}});
+(function(){{
+    var svg = document.getElementById('wikigrafosvg');
+    if(!svg)return;
+    var vbox = svg.getAttribute('viewBox').split(' ').map(Number);
+    var scale = 1, tx = 0, ty = 0, dragging = false, lastX, lastY;
+    function updateView(){{
+        var w = vbox[2]*scale, h = vbox[3]*scale;
+        svg.setAttribute('viewBox',(vbox[0]+tx)+' '+(vbox[1]+ty)+' '+w+' '+h);
+    }}
+    svg.addEventListener('wheel',function(e){{
+        e.preventDefault();
+        var rect = svg.getBoundingClientRect();
+        var mx = (e.clientX - rect.left)/rect.width * vbox[2]*scale + vbox[0] + tx;
+        var my = (e.clientY - rect.top)/rect.height * vbox[3]*scale + vbox[1] + ty;
+        var factor = e.deltaY > 0 ? 1.1 : 0.9;
+        scale *= factor;
+        scale = Math.max(0.1, Math.min(10, scale));
+        updateView();
+    }});
+    svg.addEventListener('mousedown',function(e){{
+        if(e.button===0){{dragging=true;lastX=e.clientX;lastY=e.clientY;svg.style.cursor='grabbing';}}
+    }});
+    window.addEventListener('mousemove',function(e){{
+        if(!dragging)return;
+        var rect = svg.getBoundingClientRect();
+        var dx = (e.clientX-lastX)/rect.width*vbox[2]*scale;
+        var dy = (e.clientY-lastY)/rect.height*vbox[3]*scale;
+        tx -= dx; ty -= dy;
+        lastX=e.clientX;lastY=e.clientY;
+        updateView();
+    }});
+    window.addEventListener('mouseup',function(){{
+        if(dragging){{dragging=false;svg.style.cursor='grab';}}
+    }});
+}})();
+{hl}
 </script>''')
 
     return "\n".join(html_parts)
