@@ -5,7 +5,7 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 ## 🚀 Caratteristiche Principali
 
 - **Architettura Multi-Agente**: Researcher, Coder, Validator, e Orchestrator lavorano insieme con meccanismo di **Self-Healing**.
-- **C64 Knowledge Engine**: Sistema RAG avanzato con supporto **HyDE** e Wiki-links Obsidian.
+- **C64 Knowledge Engine**: Sistema RAG avanzato con FAISS, embedding vettoriali e Wiki-links Obsidian.
 - **Performance Aware**: Include un **Cycle Counter** per Assembly e validazione sintattica rigorosa per BASIC v2.
 - **Configurabile & Estensibile**: Gestione tramite `agent_config.yaml` e Prompt Management System (PMS).
 
@@ -23,7 +23,7 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 ### Requisiti
 - Python 3.10+
 - ACME Assembler (per la validazione del codice, già installato nell'immagine Docker)
-  - Su host: `apt install acme` (Debian/Ubuntu) o `brew install acme` (macOS)
+  - Su host: compila da sorgente su https://github.com/lngtklnz/ACME/ o `brew install acme` (macOS)
 
 ### Setup
 ```bash
@@ -151,7 +151,7 @@ docker compose restart c64-ui
   Contenuto...
   ```
 
-**Nota importante**: I file `.txt` in `data/output/` (estrazioni OCR da PDF) NON vengono più inclusi nell'indice FAISS — contenevano artefatti OCR che causavano allucinazioni. Solo i file `.md` curati in `knowledge_base/` vengono indicizzati.
+**Nota importante**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF) vengono ora inclusi nell'indice FAISS con un filtro per parole chiave tecniche (≥15 match su un vocabolario C64). Per escluderli, imposta `SKIP_PDF=1` nell'ambiente. I file `.md` curati in `knowledge_base/` rimangono la fonte principale.
 
 ## 🧠 Knowledge Distillation
 

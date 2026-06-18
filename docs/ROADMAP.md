@@ -7,7 +7,7 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 | Componente | Stato | Note |
 | :--- | :--- | :--- |
 | **Orchestrator** | ✅ Funzionante | Gestisce il flusso base e un round di self-healing. |
-| **Researcher** | ✅ Funzionante | RAG con FAISS e Obsidian Wiki-links. |
+| **Researcher** | ✅ Funzionante | RAG con FAISS + filtro PDF, k=10, wiki-links. HyDE disabilitato. |
 | **Coder** | ✅ Funzionante | Supporto BASIC e Assembly con CoT. |
 | **Validator** | ⚠️ Parziale | ACME per ASM, Parser interno per BASIC (base). |
 | **UI (Gradio)** | ✅ Funzionante | Interfaccia chat con Prompt Library. |
@@ -25,7 +25,17 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - [x] **Configurazione Unificata**: Spostare parametri (timeout, round, modelli) in un file YAML. (Implementato in `config/agent_config.yaml`)
 - [x] **Use Cases Documentati**: Aggiungere esempi reali di interazione nel README. (Implementato in `docs/USE_CASES.md`)
 
-### 3. Documentazione (Consolidamento)
+### 3. Stabilità RAG e Robustezza (Giugno 2026)
+- [x] **Knowledge Base riscritta**: Sostituito langchain FAISS + HuggingFaceEmbeddings con FAISS diretto + sentence-transformers, risolvendo OOM e incompatibilità.
+- [x] **Inclusione PDF con filtro**: `data/output/*_clean.txt` ora indicizzato con filtro keyword (≥15 termini tecnici), risolvendo allucinazioni OCR.
+- [x] **Rimozione HyDE**: Disabilitato (`use_hyde: false`) — peggiorava il retrieval con allucinazioni del modello 1.5B.
+- [x] **k_results aumentato**: Da 3 a 10, migliorando la copertura del contesto.
+- [x] **Chunking migliorato**: `chunk_size` da 500→2000 e `chunk_overlap` da 50→200 per contesto tecnico completo.
+- [x] **Falsi `.asm` filtrati**: File PDF/binari rinominati come `.asm` (doppia estensione, >500KB) esclusi dall'indice.
+- [x] **ACME cross-assembler**: Compilato da sorgente e integrato nella validazione.
+- [x] **Prompt system rafforzato**: Regole esplicite per prevenire comandi BASIC inesistenti e allucinazioni su indirizzi.
+
+### 4. Documentazione (Consolidamento)
 - [x] **Unificazione Technical Manual**: Unificare i vari `DEEP_DIVE` in un unico manuale tecnico. (Implementato in `docs/TECHNICAL_MANUAL.md`)
 - [x] **Aggiornamento README**: Inseriti link a Use Cases e Roadmap. (Completato)
 
@@ -34,7 +44,7 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 ## 🚀 Prossimi Passi (Evoluzione Futura)
 
 - [ ] **Reranking semantico**: Migliorare la precisione del RAG con un cross-encoder.
-- [x] **HyDE (Hypothetical Document Embeddings)**: Migliorare il recupero di documenti tecnici complessi. (Implementato)
+- [ ] **HyDE (Hypothetical Document Embeddings)**: Disabilitato — il modello 1.5B generava risposte ipotetiche allucinate. Sostituito da `k_results=10` e chunk più ampi.
 - [x] **Cycle Counter per Assembly**: Analisi delle performance del codice generato. (Implementato in `utils/cycle_counter.py`)
 
 ---
@@ -45,3 +55,4 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - **Fase 2: Refactoring UI e Feedback**: Completata (Config unificata, Logs in UI).
 - **Fase 3: Simulazione Use Cases**: Completata (Documentati in `docs/USE_CASES.md`).
 - **Fase 4: Aggiornamento Documentazione**: Completata.
+- **Fase 5: Stabilità RAG e Robustezza (Giugno 2026)**: Completata (KB riscritta, PDF inclusi con filtro, HyDE disabilitato, k=10, chunk 2000/200, falsi `.asm` esclusi, ACME integrato, prompt rafforzato).

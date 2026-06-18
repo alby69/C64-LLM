@@ -6,11 +6,11 @@ agent:
   max_new_tokens: 512
 
 rag:
-  k_results: 3
+  k_results: 10
   follow_links: true
-  use_hyde: true
-  chunk_size: 500
-  chunk_overlap: 50
+  use_hyde: false
+  chunk_size: 1000
+  chunk_overlap: 200
 
 teacher:
   # Backend: opencode | openrouter | groq | ollama | huggingface

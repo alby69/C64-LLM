@@ -14,6 +14,7 @@ Quando la RAG è attiva, il sistema cerca i chunk più rilevanti in un indice FA
 | `data/input/*.bas.txt` | Programmi BASIC v2 estratti da D64/G64/PRG | vari |
 | `data/input/*.ml.txt` | Codice machine language estratto | vari |
 | `data/src/*.asm` | Assembly 6502 scaricato da siti (Codebase64, 6502.org, ecc.) | vari |
+| `data/output/*_clean.txt` | Testo pulito da PDF tecnici C64 (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`) | 58 file / 675 totali |
 | `docs/*.md` | Documentazione interna del progetto | 6 file |
 
 ### Come viene costruito l'indice
@@ -21,7 +22,7 @@ Quando la RAG è attiva, il sistema cerca i chunk più rilevanti in un indice FA
 ```
 knowledge_base.py (C64KnowledgeBase.build_index())
   → sentence-transformers/all-MiniLM-L6-v2 (embedding)
-  → RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+  → RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
   → FAISS vector store salvato in data/vectorstore/
 ```
 
@@ -58,7 +59,7 @@ Tutti in `prompts/prompts.yaml`:
 
 | File | Parametri chiave |
 |------|------------------|
-| `config/agent_config.yaml` | `model_name: Qwen/Qwen2.5-Coder-1.5B-Instruct`, `temperature: 0.3`, `rag.k: 3`, `rag.use_hyde: true`, `rag.chunk_size: 500` |
+| `config/agent_config.yaml` | `model_name: Qwen/Qwen2.5-Coder-1.5B-Instruct`, `temperature: 0.3`, `rag.k: 10`, `rag.use_hyde: false`, `rag.chunk_size: 1000`, `rag.chunk_overlap: 200` |
 
 ---
 
@@ -72,9 +73,9 @@ Domanda utente
 │ ResearcherAgent                                │
 │  1. Query expansion (Qwen)                     │
 │  2. Language detection (Qwen)                  │
-│  3. HyDE — risposta ipotetica (Qwen, opz.)     │
-│  4. FAISS similarity search sui chunk della KB │
-│     (knowledge_base/ + data/ + docs/)          │
+│  3. FAISS similarity search sui chunk della KB │
+│     (knowledge_base/ + data/ + data/output/ +  │
+│      docs/)                                    │
 └────────────────────┬───────────────────────────┘
                      │ contesto tecnico (chunk rilevanti)
                      ▼
@@ -118,8 +119,14 @@ Qwen **non** è fine-tunato di base sul C64. La conoscenza tecnica arriva intera
 
 Il training LoRA opzionale (`pipeline/train_lora.py`) addestra Qwen su `distill_dataset.jsonl`, producendo pesi specializzati in `data/models/c64-lora-pro/`. Il training rileva automaticamente CPU vs GPU: su CPU usa il modello 0.5B con `max_length=512`; su GPU usa il modello 1.5B con `max_length=2048`.
 
-#### Nota: esclusione di `data/output/*.txt` dalla KB
-I file di testo estratti da PDF (`data/output/*_raw.txt`, `data/output/*_clean.txt`) sono stati esclusi dall'indice FAISS a giugno 2026. Questi file contenevano artefatti OCR che causavano allucinazioni (es. il modello suggeriva `$0314` invece di `$D020` per il colore del bordo). I `.md` curati in `knowledge_base/` sono sufficienti e più accurati.
+#### Nota: inclusione di `data/output/*_clean.txt` nella KB (giugno 2026)
+I file `data/output/*_clean.txt` (testo pulito da PDF tecnici C64) sono ora inclusi nell'indice FAISS con un filtro:
+- **≥15 keyword tecniche C64** su un vocabolario di ~100 termini (registri VIC-II/SID/CIA, istruzioni 6502, comandi BASIC, chip, concetti)
+- **>1KB** di dimensione
+- **Esclusi falsi `.asm`**: file in `data/src/` con doppia estensione (es. `.asm.pdf`) o >500KB (erano PDF/binari rinominati)
+- Imposta `SKIP_PDF=1` nell'ambiente per escluderli
+
+Questo ha risolto allucinazioni come `$0314` invece di `$D020` — il filtro keyword garantisce che solo testi OCR di qualità sufficiente vengano indicizzati.
 
 ---
 

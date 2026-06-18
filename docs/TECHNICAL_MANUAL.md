@@ -19,11 +19,12 @@ Il sistema opera tramite la collaborazione di 5 agenti core, coordinati da un Or
 3.  **Validazione**: Invia il codice generato al `Validator`.
 4.  **Self-Healing**: Se la validazione fallisce, attiva un ciclo di correzione automatica (fino a 3 tentativi) fornendo i log d'errore al Coder.
 
-### 2.2 ResearcherAgent (RAG + HyDE)
+### 2.2 ResearcherAgent (RAG)
 Specializzato nel recupero di informazioni dalla "Knowledge Engine":
 - **Query Expansion**: Trasforma richieste vaghe in termini tecnici C64.
-- **HyDE (Hypothetical Document Embeddings)**: Genera una risposta ipotetica per migliorare il matching vettoriale nel database FAISS.
+- **HyDE (Hypothetical Document Embeddings)**: Disabilitato di default (`use_hyde: false`). Il modello 1.5B generava risposte ipotetiche allucinate che peggioravano il retrieval. Sostituito da `k_results=10` e chunk più ampi.
 - **Graph Navigation**: Supporta Wiki-links in stile Obsidian per navigare tra documenti correlati (es. da "VIC-II" a "Sprite Registers").
+- **PDF filtering**: I file `data/output/*_clean.txt` sono inclusi nell'indice solo se superano un filtro keyword (≥15 termini tecnici C64), per escludere artefatti OCR di bassa qualità.
 
 ### 2.3 CoderAgent (Sintesi di Codice)
 L'agente esecutivo che scrive il codice:
@@ -82,7 +83,7 @@ Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tec
 - **Vault Obsidian**: La documentazione è strutturata in Markdown (9 manuali: `vic2_registers.md`, `raster_interrupts.md`, `sprite_programming.md`, `sid_programming.md`, `kernal_routines.md`, `6502_addressing_modes.md`, `c64_screen_routines.md`, `c64_basic_tutorial.md`, `c64_memory_map.md`) con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
 - **Pipeline**: Include strumenti di pulizia per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
-- **Esclusione OCR**: I file `data/output/*.txt` (estrazioni OCR raw/clean) NON vengono più indicizzati — causavano allucinazioni. Solo i `.md` curati in `knowledge_base/` sono usati per la RAG.
+- **Inclusione PDF filtrata**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF tecnici) sono ora inclusi con filtro keyword (≥15 termini C64, >1KB). Imposta `SKIP_PDF=1` per escluderli. I `.md` curati rimangono la fonte principale.
 
 ---
 
@@ -96,9 +97,9 @@ Il tab **Knowledge Base** include una sezione "Esplora file KB" con:
 ### 3.1.1 Chunking
 
 Lo splitter utilizza `RecursiveCharacterTextSplitter` con:
-- `chunk_size=1500`, `chunk_overlap=150`
+- `chunk_size=2000`, `chunk_overlap=200`
 - Separatori: `["\n\n", "\n", ".", " ", ""]`
-- A differenza del vecchio `CharacterTextSplitter(chunk_size=500)`, evita warning "Created a chunk of size X which is longer than the specified 500" e gestisce meglio codice assembly/BASIC preservando la struttura lessicale.
+- A differenza del vecchio `CharacterTextSplitter(chunk_size=500)`, evita warning e gestisce meglio codice assembly/BASIC preservando la struttura lessicale. Chunk più ampi (2000 vs 1500) migliorano il recall includendo contesto tecnico completo.
 
 ### 3.1.2 Encoding Handling
 
@@ -145,7 +146,10 @@ L'agente gestisce array (`DIM`) e input, validando che i nomi delle variabili no
 
 Il sistema è altamente configurabile tramite `config/agent_config.yaml`:
 - **agent.max_attempts**: Numero di round di self-healing.
-- **rag.use_hyde**: Abilita/disabilita la generazione ipotetica.
+- **rag.k**: Numero di chunk recuperati (default: 10).
+- **rag.use_hyde**: Disabilitato di default (`false`) — il modello 1.5B allucina risposte ipotetiche.
+- **rag.chunk_size**: Dimensione chunk per indicizzazione (default: 1000, KB usa 2000).
+- **rag.chunk_overlap**: Overlap tra chunk (default: 200).
 - **ui.prompt_library**: Lista di prompt predefiniti nella Gradio UI.
 
 ### 5.1 Backend Modello

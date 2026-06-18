@@ -11,6 +11,17 @@ TIMEOUT = 5  # secondi esecuzione
 
 # === TEST ASM ===
 def test_asm_code(asm_code: str):
+    # Verifica che ACME sia disponibile
+    acme_path = ACME_PATH
+    if not os.path.isfile(acme_path):
+        # Cerca in PATH
+        import shutil
+        which_acme = shutil.which(ACME_PATH)
+        if which_acme:
+            acme_path = which_acme
+        else:
+            return False, "ERRORE: ACME assembler non trovato. Installa ACME per compilare il codice assembly."
+
     with tempfile.TemporaryDirectory() as tmpdir:
         asm_file = os.path.join(tmpdir, "test.asm")
         prg_file = os.path.join(tmpdir, "test.prg")
@@ -30,7 +41,7 @@ def test_asm_code(asm_code: str):
         # Compila
         try:
             compile_result = subprocess.run(
-                [ACME_PATH, "-f", "cbm", "-o", prg_file, asm_file],
+                [acme_path, "-f", "cbm", "-o", prg_file, asm_file],
                 capture_output=True,
                 text=True,
             )
@@ -53,7 +64,7 @@ def test_asm_code(asm_code: str):
             emu.kill()
 
         except FileNotFoundError:
-            return True, "OK (emulatore non disponibile, compilazione OK)"
+            return True, "OK (VICE emulatore non disponibile, compilazione OK)"
         except Exception as e:
             return False, f"Errore emulatore: {e}"
 

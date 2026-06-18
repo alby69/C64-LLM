@@ -36,8 +36,8 @@
            │  .py            │  │  (QA pairs)          │    │ (file .md con       │
             │  carica .bas.txt│  └────────┬─────────────┘    │  frontmatter)       │
             │  .ml.txt .md    │           │                  │  + tutorial BASIC   │
-            │  .asm           │           ▼                  └──────────┬──────────┘
-            │  (NO data/out/  │           │                           │
+             │  .asm .clean.txt│           ▼                  └──────────┬──────────┘
+             │  (filtrato)     │           │                           │
            └────────┬────────┘  ┌──────────────────────┐              │
                     │           │ dataset_unified      │              │
                     │           │  .jsonl              │              │
@@ -72,12 +72,12 @@
 | **pdf2text.py** | Estrae testo grezzo da PDF | `data/output/raw.txt` |
 | **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
 | **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
-| **knowledge_base.py** | Costruisce indice FAISS da `.md` + `.bas.txt` + `.ml.txt` + `.asm` (esclude `data/output/*.txt`) | `data/vectorstore/` |
+| **knowledge_base.py** | Costruisce indice FAISS da `.md` + `.bas.txt` + `.ml.txt` + `.asm` + `data/output/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`) | `data/vectorstore/` |
 | **estrazione EPUB** | `_extract_epub_text()` in `agent_pro.py`: decompone ZIP EPUB, estrae testo da XHTML/HTML con `HTMLParser` stdlib; fallback a `pandoc` | `data/output/raw.txt` |
 | **estrazione HTML** | `_extract_html_text()` in `agent_pro.py`: pulisce tag HTML con `HTMLParser` stdlib, ignora script/style | `data/output/raw.txt` |
 | **Google Drive** | `download_and_integrate()` enumera file con `gdown.download_folder(skip_download=True)`, poi scarica file per file. Fallback su `requests` diretto via `uc?id=` quando gdown fallisce per rate limiting. Ritardo 1.5s tra file. | `data/input/drive_<id>/` |
 | **Auto-elabora link dalla chat** | Spunta "Auto-elabora link" nella Chat: estrae URL da messaggio e risposta, aggiunge a `custom_sites.json`, avvia `download_and_integrate()` per ogni URL | Aggiunge siti + pipeline completa |
-| **Chunking** | `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)` con separatori `["\n\n", "\n", ".", " ", ""]` | `data/vectorstore/` |
+| **Chunking** | `RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)` con separatori `["\n\n", "\n", ".", " ", ""]` | `data/vectorstore/` |
 | **prompts/prompts.yaml** | Template prompt per researcher, coder, orchestrator, crawler | (config) |
 | **config/agent_config.yaml** | Config agente: tentativi, temperatura, RAG parametri | (config) |
 
@@ -167,7 +167,7 @@ Il prompt di sistema per il coder (`coder.base.system`) è stato rafforzato per 
 
 - La **KB** (indice FAISS) serve solo per la **ricerca RAG durante la chat**. Non influisce sul modello.
 - Il **training LoRA** usa `distill_dataset.jsonl` (non `dataset_unified.jsonl`), non la KB.
-- I file `data/output/*.txt` (estrazioni OCR da PDF) sono stati esclusi dall'indice FAISS — contenevano artefatti OCR che causavano allucinazioni tecniche nel modello (es. `$0314` scambiato per registro colore bordo). Solo i `.md` curati in `knowledge_base/` sono fonti affidabili per la RAG.
+- I file `data/output/*_clean.txt` (estrazioni OCR da PDF) sono ora inclusi nell'indice FAISS con filtro keyword (≥15 termini tecnici C64, >1KB) — risolve le allucinazioni filtrando solo testi OCR di qualità sufficiente. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati in `knowledge_base/` rimangono la fonte principale.
 - `extract_g64.py` usa decodifica GCR nibble-to-nibble, supporta immagini G64 standard a 35-40 tracce.
 - `extract_prg.py` riconosce automaticamente BASIC (detokenize) vs ML (hex dump).
 - I file `.bas.txt` e `.ml.txt` vengono automaticamente inclusi nell'indice FAISS.
