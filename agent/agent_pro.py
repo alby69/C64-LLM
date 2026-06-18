@@ -1692,9 +1692,19 @@ def render_wiki_graph_html(selected_node=None):
         if(typeof vis !== 'undefined'){initGraph();}else{
             var s=document.createElement('script');
             s.onload=initGraph;
-            s.src='https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/vis-network.min.js';
+            s.onerror=function(){
+                document.getElementById('wiki-graph-loading').innerHTML =
+                    'Impossibile caricare la libreria vis.js. Verifica la connessione internet.';
+            };
+            s.src='https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js';
             document.head.appendChild(s);
         }
+        setTimeout(function(){
+            var el=document.getElementById('wiki-graph-loading');
+            if(el && el.style.display!='none'){
+                el.innerHTML='Tempo scaduto. Verifica la connessione internet o ricarica.';
+            }
+        },8000);
     })();
     </script>
     """
