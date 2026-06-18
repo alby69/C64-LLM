@@ -88,8 +88,10 @@ class ResearcherAgent:
 
         context = f"\nLinguaggio richiesto (rilevato): {lang}\n"
         context += "\nInformazioni dal Knowledge Base:\n"
-        for i, doc in enumerate(docs):
+        max_chunks = 5
+        for i, doc in enumerate(docs[:max_chunks]):
             source = doc.metadata.get('source', 'Unknown')
             context += f"--- Frammento {i+1} (Sorgente: {source}) ---\n{doc.page_content}\n"
 
+        print(f"[Researcher] Context built from {min(len(docs), max_chunks)} chunks ({len(context)} chars)")
         return context
