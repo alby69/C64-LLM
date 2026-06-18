@@ -206,17 +206,37 @@ class C64KnowledgeBase:
             except Exception as e:
                 print(f"  Skipping {fname}: {e}")
 
+    def _source_boost(self, source):
+        source = source or ""
+        if "knowledge_base/" in source:
+            return 3.0
+        if "data/src/" in source:
+            return 2.0
+        if "docs/" in source:
+            return 1.5
+        if "data/output/" in source:
+            return 0.3
+        return 1.0
+
     def query(self, text, k=10, follow_links=True):
         if not hasattr(self, "index"):
             self.load_index()
 
+        fetch_k = min(k * 6, len(self.docstore))
         emb = self._model.encode([text])
-        scores, idxs = self.index.search(emb.astype(np.float32), k)
+        scores, idxs = self.index.search(emb.astype(np.float32), fetch_k)
 
-        results = []
+        scored = []
         for score, idx in zip(scores[0], idxs[0]):
             if idx < 0:
                 continue
+            src = self.docstore_meta[idx].get("source", "")
+            boost = self._source_boost(src)
+            scored.append((score * boost, idx))
+
+        scored.sort(key=lambda x: -x[0])
+        results = []
+        for _, idx in scored[:k]:
             results.append(
                 Document(
                     page_content=self.docstore[idx],

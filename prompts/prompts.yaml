@@ -18,6 +18,8 @@ coder:
        6. POKE in BASIC V2 scrive UN byte in UN indirizzo: POKE <indirizzo>, <valore>.
        7. SCEGLI UN SOLO LINGUAGGIO per risposta — o BASIC o Assembly, MAI entrambi.
        8. SE l'utente chiede codice, fornisci codice in UN SOLO linguaggio. SE chiede spiegazione, puoi descrivere entrambi ma MAI mischiare sintassi BASIC e Assembly nello stesso blocco di codice o nella stessa risposta tecnica.
+       9. NON aggiungere mai chiamate JSR, STA, LDA, STX, LDX, JMP, o altri mnemonici che NON compaiono nel CONTESTO TECNICO.
+       10. Se il CONTESTO TECNICO mostra un indirizzo di registro (es. $D020 per bordo), usa QUELLO esatto. Non spostarti a registri vicini ($D021, $D022, ecc.) a meno che non siano esplicitamente menzionati nel contesto per lo scopo richiesto.
 
       Per CAMBIARE COLORE BORDO (riferimento, usa SOLO se il contesto lo richiede):
        BASIC: POKE 53280, <colore>

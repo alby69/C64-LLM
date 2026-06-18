@@ -220,15 +220,7 @@ class C64CodingAgent:
                 max_attempts=max_attempts,
             )
 
-            log_text = ""
-            if logs:
-                log_text = (
-                    "\n\n<details><summary>Pensieri dell'Agente (Logs)</summary>\n\n"
-                    + "\n".join([f"- {l}" for l in logs])
-                    + "\n</details>"
-                )
-
-            base = response + log_text
+            base = response
             yield base
 
             if not auto_scrape:
