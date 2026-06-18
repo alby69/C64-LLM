@@ -1603,57 +1603,99 @@ def load_wiki_graph():
 
 
 def render_wiki_graph_html(selected_node=None):
+    import json as _json
     graph = load_wiki_graph()
     nodes = graph.get("nodes", [])
-    edges = graph.get("edges", [])
+    edges_list = graph.get("edges", [])
 
-    import random
-    colors = {"chip": "#e74c3c", "software": "#3498db", "concetto": "#2ecc71",
-              "registro": "#f39c12", "opcode": "#9b59b6", "basic": "#1abc9c"}
+    colors = {"chip": "#ff6b6b", "software": "#4ecdc4", "concetto": "#45b7d1",
+              "registro": "#ffa726", "opcode": "#ab47bc", "basic": "#66bb6a"}
 
-    nodes_json = []
+    vis_nodes = []
     for n in nodes:
         c = colors.get(n.get("category", "concetto"), "#888")
-        nodes_json.append(f'{{id:"{n["id"]}",label:"{n["label"]}",color:"{c}",'
-                          f'title:"{n.get("description","").replace(chr(34),chr(39))}"}}')
+        vis_nodes.append({
+            "id": n["id"],
+            "label": n["label"],
+            "color": c,
+            "size": 22,
+            "category": n.get("category", ""),
+            "description": n.get("description", ""),
+        })
 
-    edges_json = []
-    for e in edges:
-        label = e.get("label", "")
-        edges_json.append(f'{{from:"{e["from"]}",to:"{e["to"]}",label:"{label}"}}')
+    vis_edges = []
+    for e in edges_list:
+        vis_edges.append({"from": e["from"], "to": e["to"], "label": e.get("label", "")})
 
-    highlight = ""
+    nodes_json = _json.dumps(vis_nodes, ensure_ascii=False)
+    edges_json = _json.dumps(vis_edges, ensure_ascii=False)
+
+    highlight_js = ""
     if selected_node:
-        highlight = f'network.selectNodes(["{selected_node}"],true);'
+        sel = selected_node.replace("'", "\\'")
+        highlight_js = (
+            "setTimeout(function(){"
+            "network.selectNodes(['%s'],true);"
+            "network.focus('%s',{scale:1.5});"
+            "},500);" % (sel, sel)
+        )
 
-    return f"""
-    <div id="wiki-graph" style="width:100%;height:600px;border:1px solid #444;border-radius:8px;background:#0d0d1a"></div>
-    <div id="wiki-desc" style="margin-top:8px;padding:10px;border:1px solid #444;border-radius:8px;background:#1a1a2e;min-height:50px;color:#ccc;font-size:14px"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/vis-network.min.js"></script>
+    return """
+    <div id="wiki-graph-loading" style="text-align:center;padding:40px;color:#aaa">Caricamento grafo...</div>
+    <div id="wiki-graph" style="width:100%;height:600px;border:1px solid #555;border-radius:8px;background:#1a1a2e;display:none"></div>
+    <div id="wiki-desc" style="margin-top:8px;padding:12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:50px;color:#ccc;font-size:14px">Clicca un nodo per vedere la descrizione.</div>
     <script>
-    (function(){{
-        var nodes = new vis.DataSet([{",".join(nodes_json)}]);
-        var edges = new vis.DataSet([{",".join(edges_json)}]);
-        var container = document.getElementById('wiki-graph');
-        var data = {{nodes:nodes,edges:edges}};
-        var options = {{
-            physics:{{stabilization:false,barnesHut:{{springLength:180,springConstant:0.02,damping:0.09}}}},
-            nodes:{{shape:'dot',size:18,font:{{color:'#eee',size:14}}}},
-            edges:{{font:{{size:10,color:'#aaa'}},color:{{color:'#555',highlight:'#88ccff'}},width:1,smooth:true}},
-            interaction:{{hover:true,tooltipDelay:200,selectable:true}}
-        }};
-        var network = new vis.Network(container, data, options);
-        network.on('selectNode', function(params){{
-            var nodeId = params.nodes[0];
-            var node = nodes.get(nodeId);
-            document.getElementById('wiki-desc').innerHTML =
-                '<b style=\"color:#88ccff\">' + node.label + '</b><br>' + node.title;
-        }});
-        {highlight}
-        network.on('deselectNode', function(){{
-            document.getElementById('wiki-desc').innerHTML = 'Clicca un nodo per vedere la descrizione.';
-        }});
-    }})();
+    (function(){
+        var nodesData = """ + nodes_json + """;
+        var edgesData = """ + edges_json + """;
+        function initGraph(){
+            try {
+                var nodes = new vis.DataSet(nodesData);
+                var edges = new vis.DataSet(edgesData);
+                var container = document.getElementById('wiki-graph');
+                document.getElementById('wiki-graph-loading').style.display='none';
+                container.style.display='block';
+                var data = {nodes:nodes,edges:edges};
+                var options = {
+                    physics:{barnesHut:{springLength:200,springConstant:0.03,damping:0.1,gravitationalConstant:-5000}},
+                    nodes:{shape:'dot',font:{color:'#fff',size:13,face:'monospace'},borderWidth:2,borderWidthSelected:3},
+                    edges:{
+                        font:{size:10,color:'#aaa',strokeWidth:2,strokeColor:'#1a1a2e'},
+                        color:{color:'#999',highlight:'#88ccff',hover:'#88ccff'},
+                        width:1.5,smooth:{type:'continuous'}
+                    },
+                    interaction:{
+                        hover:true,tooltipDelay:100,
+                        selectable:true,navigationButtons:true,keyboard:true
+                    },
+                    configure:{filter:['physics']}
+                };
+                var network = new vis.Network(container, data, options);
+                network.on('selectNode', function(params){
+                    var nodeId = params.nodes[0];
+                    var node = nodes.get(nodeId);
+                    var desc = node.description || node.id;
+                    document.getElementById('wiki-desc').innerHTML =
+                        '<b style="color:#88ccff;font-size:16px">' + node.label + '</b><br>' +
+                        '<span style="color:#aaa;font-size:12px">' + (node.category||'') + '</span><br>' +
+                        '<span style="color:#ddd">' + desc + '</span>';
+                });
+                network.on('deselectNode', function(){
+                    document.getElementById('wiki-desc').innerHTML = 'Clicca un nodo per vedere la descrizione.';
+                });
+                """ + highlight_js + """
+            } catch(e) {
+                document.getElementById('wiki-graph-loading').innerHTML =
+                    'Errore: ' + e.message + '. Ricarica la pagina.';
+            }
+        }
+        if(typeof vis !== 'undefined'){initGraph();}else{
+            var s=document.createElement('script');
+            s.onload=initGraph;
+            s.src='https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/vis-network.min.js';
+            document.head.appendChild(s);
+        }
+    })();
     </script>
     """
 
