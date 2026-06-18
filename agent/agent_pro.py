@@ -1602,112 +1602,108 @@ def load_wiki_graph():
         return json.load(f)
 
 
-def render_wiki_graph_html(selected_node=None):
+def render_wiki_graph_svg(selected_node=None):
+    import networkx as nx
     import json as _json
     graph = load_wiki_graph()
-    nodes = graph.get("nodes", [])
-    edges_list = graph.get("edges", [])
+    raw_nodes = graph.get("nodes", [])
+    raw_edges = graph.get("edges", [])
 
     colors = {"chip": "#ff6b6b", "software": "#4ecdc4", "concetto": "#45b7d1",
               "registro": "#ffa726", "opcode": "#ab47bc", "basic": "#66bb6a"}
 
-    vis_nodes = []
-    for n in nodes:
-        c = colors.get(n.get("category", "concetto"), "#888")
-        vis_nodes.append({
-            "id": n["id"],
-            "label": n["label"],
-            "color": c,
-            "size": 22,
-            "category": n.get("category", ""),
-            "description": n.get("description", ""),
+    node_map = {n["id"]: n for n in raw_nodes}
+    G = nx.Graph()
+    for n in raw_nodes:
+        G.add_node(n["id"])
+    for e in raw_edges:
+        G.add_edge(e["from"], e["to"])
+
+    if len(raw_nodes) == 0:
+        return "<p style='color:#888'>Nessun nodo nel grafo.</p>"
+
+    pos = nx.spring_layout(G, k=2.5, iterations=50, seed=42)
+
+    xs = [p[0] for p in pos.values()]
+    ys = [p[1] for p in pos.values()]
+    minx, maxx = min(xs), max(xs)
+    miny, maxy = min(ys), max(ys)
+    rx, ry = maxx - minx, maxy - miny
+    if rx == 0:
+        rx = 1
+    if ry == 0:
+        ry = 1
+    W, H = 900, 600
+    margin = 60
+    s = min((W - 2 * margin) / rx, (H - 2 * margin) / ry) * 0.85
+    cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
+
+    def to_svg_coord(x, y):
+        return (W / 2 + (x - cx) * s, H / 2 + (y - cy) * s)
+
+    # Build node data JSON for JS
+    node_data = []
+    for nid, (x, y) in pos.items():
+        node = node_map.get(nid, {})
+        cat = node.get("category", "concetto")
+        node_data.append({
+            "id": nid, "label": node.get("label", nid),
+            "cat": cat, "desc": node.get("description", ""),
+            "x": to_svg_coord(x, y)[0], "y": to_svg_coord(x, y)[1],
+            "color": colors.get(cat, "#888"),
         })
+    edge_data = []
+    for e in raw_edges:
+        if e["from"] in pos and e["to"] in pos:
+            edge_data.append({"from": e["from"], "to": e["to"], "label": e.get("label", "")})
 
-    vis_edges = []
-    for e in edges_list:
-        vis_edges.append({"from": e["from"], "to": e["to"], "label": e.get("label", "")})
-
-    nodes_json = _json.dumps(vis_nodes, ensure_ascii=False)
-    edges_json = _json.dumps(vis_edges, ensure_ascii=False)
-
-    highlight_js = ""
-    if selected_node:
-        sel = selected_node.replace("'", "\\'")
-        highlight_js = (
-            "setTimeout(function(){"
-            "network.selectNodes(['%s'],true);"
-            "network.focus('%s',{scale:1.5});"
-            "},500);" % (sel, sel)
+    html_parts = []
+    html_parts.append('<div style="position:relative">')
+    html_parts.append(f'<svg id="wikigrafosvg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">')
+    html_parts.append(f'<rect width="{W}" height="{H}" fill="#1a1a2e" rx="8"/>')
+    for ed in edge_data:
+        x1 = next(n["x"] for n in node_data if n["id"] == ed["from"])
+        y1 = next(n["y"] for n in node_data if n["id"] == ed["from"])
+        x2 = next(n["x"] for n in node_data if n["id"] == ed["to"])
+        y2 = next(n["y"] for n in node_data if n["id"] == ed["to"])
+        html_parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#555" stroke-width="1.5"/>')
+        if ed["label"]:
+            html_parts.append(f'<text x="{(x1+x2)/2:.1f}" y="{(y1+y2)/2-6:.1f}" fill="#888" font-size="9" text-anchor="middle">{ed["label"]}</text>')
+    for nd in node_data:
+        r = 7
+        html_parts.append(
+            f'<g style="cursor:pointer" onclick="showNode(\'{nd["id"]}\')" '
+            f'onmouseover="this.querySelector(\'circle\').setAttribute(\'stroke-width\',\'3\')" '
+            f'onmouseout="this.querySelector(\'circle\').setAttribute(\'stroke-width\',\'1.5\')">'
+            f'<circle cx="{nd["x"]:.1f}" cy="{nd["y"]:.1f}" r="{r}" fill="{nd["color"]}" '
+            f'stroke="#fff" stroke-width="1.5"/>'
+            f'<text x="{nd["x"]:.1f}" y="{nd["y"]+r+11}" fill="#eee" font-size="9" '
+            f'text-anchor="middle" font-family="monospace">{nd["label"]}</text></g>'
         )
+    html_parts.append('</svg>')
+    html_parts.append('</div>')
+    html_parts.append(f'<div id="wikidesc" style="margin-top:8px;padding:12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:50px;color:#ccc;font-size:14px">Clicca un nodo per vedere la descrizione.</div>')
 
-    return """
-    <div id="wiki-graph-loading" style="text-align:center;padding:40px;color:#aaa">Caricamento grafo...</div>
-    <div id="wiki-graph" style="width:100%;height:600px;border:1px solid #555;border-radius:8px;background:#1a1a2e;display:none"></div>
-    <div id="wiki-desc" style="margin-top:8px;padding:12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:50px;color:#ccc;font-size:14px">Clicca un nodo per vedere la descrizione.</div>
-    <script>
-    (function(){
-        var nodesData = """ + nodes_json + """;
-        var edgesData = """ + edges_json + """;
-        function initGraph(){
-            try {
-                var nodes = new vis.DataSet(nodesData);
-                var edges = new vis.DataSet(edgesData);
-                var container = document.getElementById('wiki-graph');
-                document.getElementById('wiki-graph-loading').style.display='none';
-                container.style.display='block';
-                var data = {nodes:nodes,edges:edges};
-                var options = {
-                    physics:{barnesHut:{springLength:200,springConstant:0.03,damping:0.1,gravitationalConstant:-5000}},
-                    nodes:{shape:'dot',font:{color:'#fff',size:13,face:'monospace'},borderWidth:2,borderWidthSelected:3},
-                    edges:{
-                        font:{size:10,color:'#aaa',strokeWidth:2,strokeColor:'#1a1a2e'},
-                        color:{color:'#999',highlight:'#88ccff',hover:'#88ccff'},
-                        width:1.5,smooth:{type:'continuous'}
-                    },
-                    interaction:{
-                        hover:true,tooltipDelay:100,
-                        selectable:true,navigationButtons:true,keyboard:true
-                    },
-                    configure:{filter:['physics']}
-                };
-                var network = new vis.Network(container, data, options);
-                network.on('selectNode', function(params){
-                    var nodeId = params.nodes[0];
-                    var node = nodes.get(nodeId);
-                    var desc = node.description || node.id;
-                    document.getElementById('wiki-desc').innerHTML =
-                        '<b style="color:#88ccff;font-size:16px">' + node.label + '</b><br>' +
-                        '<span style="color:#aaa;font-size:12px">' + (node.category||'') + '</span><br>' +
-                        '<span style="color:#ddd">' + desc + '</span>';
-                });
-                network.on('deselectNode', function(){
-                    document.getElementById('wiki-desc').innerHTML = 'Clicca un nodo per vedere la descrizione.';
-                });
-                """ + highlight_js + """
-            } catch(e) {
-                document.getElementById('wiki-graph-loading').innerHTML =
-                    'Errore: ' + e.message + '. Ricarica la pagina.';
-            }
-        }
-        if(typeof vis !== 'undefined'){initGraph();}else{
-            var s=document.createElement('script');
-            s.onload=initGraph;
-            s.onerror=function(){
-                document.getElementById('wiki-graph-loading').innerHTML =
-                    'Impossibile caricare la libreria vis.js. Verifica la connessione internet.';
-            };
-            s.src='https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js';
-            document.head.appendChild(s);
-        }
-        setTimeout(function(){
-            var el=document.getElementById('wiki-graph-loading');
-            if(el && el.style.display!='none'){
-                el.innerHTML='Tempo scaduto. Verifica la connessione internet o ricarica.';
-            }
-        },8000);
-    })();
-    </script>
-    """
+    node_json = _json.dumps(node_data, ensure_ascii=False)
+    hl_node = ""
+    if selected_node:
+        hl_node = f'setTimeout(function(){{showNode("{selected_node}");}},100);'
+
+    html_parts.append(f'''<script>
+var NODES = {node_json};
+function showNode(id){{
+    var n = NODES.find(function(x){{return x.id==id;}});
+    if(!n) return;
+    var desc = n.desc || '';
+    document.getElementById('wikidesc').innerHTML =
+        '<b style="color:#88ccff;font-size:16px">' + n.label + '</b><br>' +
+        '<span style="color:#aaa;font-size:12px">' + n.cat + '</span><br>' +
+        '<span style="color:#ddd">' + desc + '</span>';
+}}
+{hl_node}
+</script>''')
+
+    return "\n".join(html_parts)
 
 
 def bootstrap():
@@ -2303,19 +2299,19 @@ def launch_ui():
                 "Esplora le connessioni tra chip, registri, opcode e concetti del Commodore 64. "
                 "Clicca un nodo per vedere la descrizione."
             )
-            wiki_graph_html = gr.HTML(render_wiki_graph_html())
+            wiki_graph_html = gr.HTML(render_wiki_graph_svg())
             wiki_search = gr.Textbox(
                 label="Cerca nodo",
                 placeholder="es. VIC-II, $D020, sprite...",
             )
             wiki_search.submit(
-                fn=lambda q: render_wiki_graph_html(q if q else None),
+                fn=lambda q: render_wiki_graph_svg(q if q else None),
                 inputs=wiki_search,
                 outputs=wiki_graph_html,
             )
             wiki_reset = gr.Button("Reimposta grafo")
             wiki_reset.click(
-                fn=lambda: render_wiki_graph_html(None),
+                fn=lambda: render_wiki_graph_svg(None),
                 outputs=wiki_graph_html,
             )
 
