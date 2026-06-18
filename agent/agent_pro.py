@@ -1511,198 +1511,151 @@ def get_lora_status():
     return "ℹ️ Modello base"
 
 
-TECHNICAL_TERMS = {
-    "$D020": 5,
-    "$D021": 4,
-    "$D022": 2,
-    "$D023": 2,
-    "$D011": 4,
-    "$D012": 5,
-    "$D013": 2,
-    "$D01A": 3,
-    "$D019": 3,
-    "$D01E": 2,
-    "$D01F": 2,
-    "$D01D": 2,
-    "$D400": 3,
-    "$D418": 3,
-    "$D41B": 2,
-    "$D800": 4,
-    "$D81D": 2,
-    "$DC00": 3,
-    "$DC01": 3,
-    "$DC0D": 2,
-    "$DD00": 3,
-    "$DD0D": 2,
-    "$0314": 4,
-    "$0315": 3,
-    "$FFD2": 4,
-    "$FFE4": 3,
-    "$FFCF": 2,
-    "$FF81": 2,
-    "VIC-II": 5,
-    "SID": 5,
-    "CIA": 4,
-    "KERNAL": 5,
-    "Zero Page": 4,
-    "Stack Pointer": 3,
-    "Program Counter": 3,
-    "Accumulator": 4,
-    "X Register": 3,
-    "Y Register": 3,
-    "Status Register": 3,
-    "Carry Flag": 3,
-    "Zero Flag": 3,
-    "Interrupt Flag": 2,
-    "Decimal Flag": 2,
-    "Overflow Flag": 2,
-    "Negative Flag": 2,
-    "Raster Interrupt": 5,
-    "IRQ": 4,
-    "NMI": 3,
-    "Sprite": 4,
-    "Sprite Pointer": 3,
-    "Memory Map": 4,
-    "Screen Memory": 3,
-    "Character ROM": 3,
-    "Color RAM": 3,
-    "Bitmap": 3,
-    "Bitmap Mode": 3,
-    "Multicolor Mode": 3,
-    "Hi-res Mode": 2,
-    "Text Mode": 3,
-    "Extended Color Mode": 2,
-    "Scrolling": 3,
-    "Collision": 2,
-    "Sprite Collision": 3,
-    "Raster": 4,
-    "Bad Line": 2,
-    "Display Enable": 2,
-    "Interrupt": 4,
-    "BRK": 3,
-    "RTI": 3,
-    "RTS": 4,
-    "JSR": 4,
-    "JMP": 4,
-    "LDA": 5,
-    "STA": 5,
-    "LDX": 4,
-    "STX": 4,
-    "LDY": 4,
-    "STY": 4,
-    "TAX": 3,
-    "TAY": 3,
-    "TXA": 3,
-    "TYA": 3,
-    "ADC": 4,
-    "SBC": 4,
-    "AND": 3,
-    "ORA": 3,
-    "EOR": 3,
-    "CMP": 3,
-    "CPX": 2,
-    "CPY": 2,
-    "INC": 4,
-    "DEC": 4,
-    "INX": 3,
-    "INY": 3,
-    "DEX": 3,
-    "DEY": 3,
-    "ASL": 3,
-    "LSR": 3,
-    "ROL": 3,
-    "ROR": 3,
-    "PHA": 3,
-    "PLA": 3,
-    "PHP": 2,
-    "PLP": 2,
-    "BCC": 3,
-    "BCS": 3,
-    "BEQ": 3,
-    "BNE": 3,
-    "BMI": 2,
-    "BPL": 2,
-    "BVC": 2,
-    "BVS": 2,
-    "CLC": 3,
-    "SEC": 3,
-    "CLD": 2,
-    "SED": 2,
-    "CLI": 2,
-    "SEI": 2,
-    "CLV": 2,
-    "NOP": 2,
-    "PRINT": 4,
-    "POKE": 5,
-    "PEEK": 4,
-    "SYS": 4,
-    "GOTO": 3,
-    "GOSUB": 3,
-    "RETURN": 3,
-    "FOR": 3,
-    "NEXT": 3,
-    "IF": 4,
-    "THEN": 3,
-    "DIM": 3,
-    "DATA": 2,
-    "READ": 2,
-    "OPEN": 2,
-    "CLOSE": 2,
-    "LOAD": 3,
-    "SAVE": 3,
-    "VERIFY": 2,
-    "INPUT": 3,
-    "GET": 3,
-    "REM": 2,
-    "END": 2,
-    "STOP": 2,
-    "WAIT": 2,
-    "POKE raster": 3,
-    "SETTING raster": 3,
-}
+PROMPT_DATASET_PATH = "data/prompt_dataset.json"
+WIKI_GRAPH_PATH = "data/wiki_graph.json"
 
 
-def render_tag_cloud(query=""):
-    filtered = {
-        t: w
-        for t, w in TECHNICAL_TERMS.items()
-        if not query or query.lower() in t.lower()
-    }
-    if not filtered:
-        return "<p style='color:#888'>Nessun termine corrisponde.</p>"
-    items = sorted(filtered.items(), key=lambda x: -x[1])
-    html_parts = [
-        "<div style='display:flex;flex-wrap:wrap;gap:6px;align-items:center;"
-        "padding:8px;border:1px solid #444;border-radius:8px;background:#1a1a2e;min-height:100px'>"
-    ]
-    sizes = {1: 12, 2: 14, 3: 17, 4: 21, 5: 26}
-    for term, weight in items:
-        fs = sizes.get(weight, 14)
-        color = f"hsl({max(200, 260 - weight * 20)}, 70%, {55 + weight * 4}%)"
-        html_parts.append(
-            f"<span onclick='pickTechTerm(\"{term}\")' "
-            f"style='font-size:{fs}px;color:{color};cursor:pointer;padding:3px 6px;"
-            f"border-radius:4px;transition:all .2s;user-select:none' "
-            f"onmouseover='this.style.background=\"rgba(255,255,255,0.15)\"' "
-            f"onmouseout='this.style.background=\"transparent\"'>{term}</span>"
-        )
-    html_parts.append("</div>")
-    html_parts.append(
-        "<script>"
-        "function pickTechTerm(t){"
-        "var e=document.querySelector('#tech-term-picker input,#tech-term-picker textarea');"
-        "if(!e)return;"
-        "var n=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set||"
-        "Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;"
-        "n.call(e,t);"
-        "e.dispatchEvent(new Event('input',{bubbles:true}));"
-        "e.dispatchEvent(new Event('change',{bubbles:true}));"
-        "var b=document.querySelector('#tech-term-apply');"
-        "if(b)b.querySelector('button').click();"
-        "}"
-        "</script>"
-    )
-    return "\n".join(html_parts)
+def load_prompt_dataset():
+    if not os.path.exists(PROMPT_DATASET_PATH):
+        return []
+    with open(PROMPT_DATASET_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_prompt_dataset(prompts):
+    with open(PROMPT_DATASET_PATH, "w", encoding="utf-8") as f:
+        json.dump(prompts, f, indent=2, ensure_ascii=False)
+
+
+def _prompt_similarity(a, b):
+    a_set = set(a.lower().split())
+    b_set = set(b.lower().split())
+    if not a_set or not b_set:
+        return 0.0
+    intersection = a_set & b_set
+    union = a_set | b_set
+    return len(intersection) / len(union)
+
+
+def add_prompt_with_dedup(text, category="Generale", tags=None, description=""):
+    prompts = load_prompt_dataset()
+    tags = tags or []
+    new_normalized = text.lower().strip().rstrip("?.!")
+    for existing in prompts:
+        existing_normalized = existing["text"].lower().strip().rstrip("?!.")
+        sim = _prompt_similarity(new_normalized, existing_normalized)
+        if sim > 0.6:
+            return False, f"Prompt troppo simile a: {existing['text']} (sim={sim:.2f})"
+    prompts.append({
+        "text": text,
+        "category": category,
+        "tags": tags,
+        "description": description,
+    })
+    save_prompt_dataset(prompts)
+    return True, "Prompt aggiunto."
+
+
+def render_prompt_library_html(category_filter=None):
+    prompts = load_prompt_dataset()
+    if not prompts:
+        return "<p style='color:#888'>Nessun prompt nella libreria.</p>"
+
+    if category_filter:
+        prompts = [p for p in prompts if p["category"] == category_filter]
+
+    categories = sorted(set(p["category"] for p in prompts))
+    html = []
+    for cat in categories:
+        cat_prompts = [p for p in prompts if p["category"] == cat]
+        html.append(f"<details style='margin-bottom:6px'><summary style='cursor:pointer;font-weight:bold;color:#88ccff'>{cat} ({len(cat_prompts)})</summary>")
+        html.append("<div style='display:flex;flex-direction:column;gap:3px;padding:4px 0'>")
+        for p in cat_prompts:
+            escaped = p["text"].replace("'", "\\'").replace('"', '&quot;')
+            title = f"{p['text']}: {p['description']}" if p.get("description") else p["text"]
+            html.append(
+                f"<button onclick=\"document.querySelector('#prompt-picker input')"
+                f"&&document.querySelector('#prompt-picker input').focus()"
+                f"||document.querySelector('#prompt-picker textarea')"
+                f"&&document.querySelector('#prompt-picker textarea').focus();"
+                f"var n=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set||"
+                f"Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;"
+                f"var e=document.querySelector('#prompt-picker input,#prompt-picker textarea');"
+                f"n.call(e,'{escaped}');"
+                f"e.dispatchEvent(new Event('input',{{bubbles:true}}));"
+                f"e.dispatchEvent(new Event('change',{{bubbles:true}}));"
+                f"var b=document.querySelector('#prompt-apply');"
+                f"if(b)b.querySelector('button').click();\""
+                f" style='display:block;width:100%;text-align:left;padding:5px 8px;"
+                f"border:1px solid #444;border-radius:5px;background:#1a1a2e;color:#ddd;"
+                f"cursor:pointer;font-size:13px'"
+                f" title='{title}'>{p['text']}</button>"
+            )
+        html.append("</div></details>")
+    return "\n".join(html)
+
+
+def load_wiki_graph():
+    if not os.path.exists(WIKI_GRAPH_PATH):
+        return {"nodes": [], "edges": []}
+    with open(WIKI_GRAPH_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def render_wiki_graph_html(selected_node=None):
+    graph = load_wiki_graph()
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+
+    import random
+    colors = {"chip": "#e74c3c", "software": "#3498db", "concetto": "#2ecc71",
+              "registro": "#f39c12", "opcode": "#9b59b6", "basic": "#1abc9c"}
+
+    nodes_json = []
+    for n in nodes:
+        c = colors.get(n.get("category", "concetto"), "#888")
+        nodes_json.append(f'{{id:"{n["id"]}",label:"{n["label"]}",color:"{c}",'
+                          f'title:"{n.get("description","").replace(chr(34),chr(39))}"}}')
+
+    edges_json = []
+    for e in edges:
+        label = e.get("label", "")
+        edges_json.append(f'{{from:"{e["from"]}",to:"{e["to"]}",label:"{label}"}}')
+
+    highlight = ""
+    if selected_node:
+        highlight = f'network.selectNodes(["{selected_node}"],true);'
+
+    return f"""
+    <div id="wiki-graph" style="width:100%;height:600px;border:1px solid #444;border-radius:8px;background:#0d0d1a"></div>
+    <div id="wiki-desc" style="margin-top:8px;padding:10px;border:1px solid #444;border-radius:8px;background:#1a1a2e;min-height:50px;color:#ccc;font-size:14px"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/vis-network.min.js"></script>
+    <script>
+    (function(){{
+        var nodes = new vis.DataSet([{",".join(nodes_json)}]);
+        var edges = new vis.DataSet([{",".join(edges_json)}]);
+        var container = document.getElementById('wiki-graph');
+        var data = {{nodes:nodes,edges:edges}};
+        var options = {{
+            physics:{{stabilization:false,barnesHut:{{springLength:180,springConstant:0.02,damping:0.09}}}},
+            nodes:{{shape:'dot',size:18,font:{{color:'#eee',size:14}}}},
+            edges:{{font:{{size:10,color:'#aaa'}},color:{{color:'#555',highlight:'#88ccff'}},width:1,smooth:true}},
+            interaction:{{hover:true,tooltipDelay:200,selectable:true}}
+        }};
+        var network = new vis.Network(container, data, options);
+        network.on('selectNode', function(params){{
+            var nodeId = params.nodes[0];
+            var node = nodes.get(nodeId);
+            document.getElementById('wiki-desc').innerHTML =
+                '<b style=\"color:#88ccff\">' + node.label + '</b><br>' + node.title;
+        }});
+        {highlight}
+        network.on('deselectNode', function(){{
+            document.getElementById('wiki-desc').innerHTML = 'Clicca un nodo per vedere la descrizione.';
+        }});
+    }})();
+    </script>
+    """
 
 
 def bootstrap():
@@ -1729,13 +1682,6 @@ def launch_ui():
 
     agent = C64CodingAgent(lora_path=lora, gguf_path=gguf)
     pm = agent.pm
-
-    prompt_library = pm.get_config("ui.prompt_library")
-    if not isinstance(prompt_library, list):
-        prompt_library = [
-            "Come posso cambiare il colore del bordo?",
-            "Esegui un ciclo in BASIC...",
-        ]
 
     with gr.Blocks(title="C64 Coding Agent PRO") as demo:
         with gr.Tab("Chat"):
@@ -1783,39 +1729,30 @@ def launch_ui():
                     )
 
                     gr.Markdown("### Prompt Library")
-                    lib_dropdown = gr.Dropdown(
-                        choices=prompt_library, label="Snippet Comuni"
+                    prompt_html = gr.HTML(render_prompt_library_html())
+                    prompt_picker = gr.Textbox(
+                        visible=False, elem_id="prompt-picker"
                     )
-                    lib_button = gr.Button("Usa Prompt")
-
-                    gr.Markdown("### Technical Terms")
-                    term_search = gr.Textbox(
-                        label="Cerca", placeholder="Filtra termini...", scale=1
+                    prompt_apply = gr.Button(
+                        "Apply", visible=False, elem_id="prompt-apply"
                     )
-                    tag_cloud = gr.HTML(render_tag_cloud())
-
-                    selected_term = gr.Textbox(
-                        visible=False, elem_id="tech-term-picker"
-                    )
-                    apply_term = gr.Button(
-                        "Apply", visible=False, elem_id="tech-term-apply"
-                    )
-
-                    term_search.change(
-                        fn=render_tag_cloud, inputs=term_search, outputs=tag_cloud
-                    )
-                    apply_term.click(
+                    prompt_apply.click(
                         fn=lambda x: x,
-                        inputs=selected_term,
+                        inputs=prompt_picker,
                         outputs=chat_interface.textbox,
                     )
 
-            def fill_prompt(choice):
-                return choice
+                    category_filter = gr.Radio(
+                        choices=["Tutti", "Assembly", "BASIC", "Grafica", "Suono", "Sistema", "Memoria"],
+                        value="Tutti",
+                        label="Categoria",
+                    )
+                    category_filter.change(
+                        fn=lambda c: render_prompt_library_html(None if c == "Tutti" else c),
+                        inputs=category_filter,
+                        outputs=prompt_html,
+                    )
 
-            lib_button.click(
-                fn=fill_prompt, inputs=lib_dropdown, outputs=chat_interface.textbox
-            )
             apply_lora_btn.click(
                 fn=apply_lora,
                 inputs=[mode_radio, lora_dropdown],
@@ -2306,6 +2243,28 @@ def launch_ui():
             distill_status_btn.click(
                 fn=on_distill_status,
                 outputs=distill_log,
+            )
+
+        with gr.Tab("Grafo Wiki"):
+            gr.Markdown("## Grafo della Conoscenza C64")
+            gr.Markdown(
+                "Esplora le connessioni tra chip, registri, opcode e concetti del Commodore 64. "
+                "Clicca un nodo per vedere la descrizione."
+            )
+            wiki_graph_html = gr.HTML(render_wiki_graph_html())
+            wiki_search = gr.Textbox(
+                label="Cerca nodo",
+                placeholder="es. VIC-II, $D020, sprite...",
+            )
+            wiki_search.submit(
+                fn=lambda q: render_wiki_graph_html(q if q else None),
+                inputs=wiki_search,
+                outputs=wiki_graph_html,
+            )
+            wiki_reset = gr.Button("Reimposta grafo")
+            wiki_reset.click(
+                fn=lambda: render_wiki_graph_html(None),
+                outputs=wiki_graph_html,
             )
 
     demo.launch(server_name="0.0.0.0", theme=gr.themes.Soft())
