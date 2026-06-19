@@ -1662,21 +1662,165 @@ def render_wiki_graph_svg(selected_node=None):
         if e["from"] in pos and e["to"] in pos:
             edge_data.append({"from": e["from"], "to": e["to"], "label": e.get("label", "")})
 
-    node_json = _json.dumps(node_data, ensure_ascii=False)
+    node_by_id = {n["id"]: n for n in node_data}
 
+    # ─── Gruppi multilivello ─────────────────────────────────────────
+    GROUPS = [
+        {"id": "group:opcode", "label": "Opcode 6502", "category": "opcode",
+         "desc": "Opcode 6502: Operation Code per Assembly 6502. I 30 codici operativi del processore 6502/6510 con i relativi modi di indirizzamento. Doppio click per esplodere i singoli comandi.",
+         "members": ["adc","sbc","lda","sta","ldx","stx","jsr","rts","jmp",
+                     "bne","beq","inc","dec","inx","dex","cmp","clc","sec",
+                     "sei","cli","nop","pha","pla","asl","lsr","ror","rol","and","ora","eor"]},
+        {"id": "group:chip", "label": "Chip C64", "category": "chip",
+         "desc": "Chip C64: i principali integrati del Commodore 64. CPU 6510 (processore), VIC-II (video), SID (audio), CIA (I/O e timer). Doppio click per esplodere.",
+         "members": ["vic-ii","sid","cia","cpu-6510"]},
+        {"id": "group:reg-vic", "label": "Reg. VIC-II", "category": "registro",
+         "desc": "Registri VIC-II: i 15 registri di controllo del chip video ($D000-$D03F). Colore bordo/sfondo, sprite, raster interrupt, scorrimento e modalita video. Doppio click per esplodere.",
+         "members": ["$D020","$D021","$D022","$D023","$D024","$D011","$D012",
+                     "$D01A","$D019","$D01E","$D01F","$D01D","$D017","$D015","$D010"]},
+        {"id": "group:reg-sid", "label": "Reg. SID", "category": "registro",
+         "desc": "Registri SID: i registri del chip audio ($D400-$D418). Frequenza oscillatore, controllo forma d'onda, inviluppo ADSR e filtro. Doppio click per esplodere.",
+         "members": ["$D400","$D404","$D405","$D406","$D418"]},
+        {"id": "group:reg-cia", "label": "Reg. CIA", "category": "registro",
+         "desc": "Registri CIA: i registri dei chip di I/O ($DC00-$DDFF). Porte parallele, joystick, scansione tastiera, timer e bank switching VIC-II. Doppio click per esplodere.",
+         "members": ["$DC00","$DC01","$DD00"]},
+        {"id": "group:reg-kernal", "label": "Vett. KERNAL", "category": "registro",
+         "desc": "Vettori KERNAL: i punti di ingresso del sistema operativo in ROM ($FF81-$FFF3). CHROUT (output), GETIN (input), PLOT (cursore), init editor. Doppio click per esplodere.",
+         "members": ["$FFD2","$FFE4","$FFCF","$FF81","$0314"]},
+        {"id": "group:basic", "label": "Comandi BASIC", "category": "basic",
+         "desc": "Comandi BASIC V2: i principali comandi del linguaggio BASIC del C64. POKE (scrittura memoria), PEEK (lettura), SYS (codice macchina), PRINT (output schermo). Doppio click per esplodere.",
+         "members": ["poke","peek","sys","print"]},
+    ]
+
+    # Mappa: node_id → group_id
+    node_group = {}
+    for g in GROUPS:
+        for mid in g["members"]:
+            node_group[mid] = g["id"]
+
+    # Posizione di ogni gruppo (centroide dei membri)
+    group_pos = {}
+    for g in GROUPS:
+        mids = [m for m in g["members"] if m in pos]
+        if not mids:
+            continue
+        gx = sum(pos[m][0] for m in mids) / len(mids)
+        gy = sum(pos[m][1] for m in mids) / len(mids)
+        sx, sy = to_svg_coord(gx, gy)
+        group_pos[g["id"]] = (round(sx, 1), round(sy, 1))
+
+    # Evita sovrapposizione tra gruppi (repulsione semplice)
+    MIN_GROUP_DIST = 75
+    for _ in range(30):
+        moved = False
+        keys = list(group_pos.keys())
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                gid1, gid2 = keys[i], keys[j]
+                x1, y1 = group_pos[gid1]
+                x2, y2 = group_pos[gid2]
+                dx, dy = x1 - x2, y1 - y2
+                dist = (dx * dx + dy * dy) ** 0.5
+                if dist < MIN_GROUP_DIST and dist > 1:
+                    push = (MIN_GROUP_DIST - dist) / 2
+                    nxv, nyv = dx / dist * push, dy / dist * push
+                    group_pos[gid1] = (round(x1 + nxv, 1), round(y1 + nyv, 1))
+                    group_pos[gid2] = (round(x2 - nxv, 1), round(y2 - nyv, 1))
+                    moved = True
+        if not moved:
+            break
+
+    # Costruisce edge proxy per ogni gruppo (collassato → esterno, deduplicati)
+    proxy_edges = {g["id"]: set() for g in GROUPS}
+    for ed in edge_data:
+        fg = node_group.get(ed["from"])
+        tg = node_group.get(ed["to"])
+        if fg and not tg and ed["to"] in node_by_id:
+            proxy_edges[fg].add(ed["to"])
+        elif tg and not fg and ed["from"] in node_by_id:
+            proxy_edges[tg].add(ed["from"])
+
+    node_json = _json.dumps(node_data, ensure_ascii=False)
+    groups_json = _json.dumps(GROUPS, ensure_ascii=False)
+    edges_json = _json.dumps(edge_data, ensure_ascii=False)
+
+    # ─── Generazione SVG ──────────────────────────────────────────────
     html_parts = []
     html_parts.append('<div id="wiki-pan">')
-    html_parts.append(f'<svg id="wikigrafosvg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" style="cursor:grab;background:#1a1a2e;border-radius:8px">')
+    html_parts.append(f'<svg id="wikigrafosvg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" tabindex="0" style="cursor:grab;background:#1a1a2e;border-radius:8px;outline:none">')
     html_parts.append(f'<rect width="{W}" height="{H}" fill="#1a1a2e" rx="8"/>')
+    html_parts.append(f'<g id="wiki-viewport" transform="translate(0,0) scale(1)">')
+
+    # ── Edges tra nodi individuati (nascosti se coinvolgono membri di gruppi collassati) ──
     for ed in edge_data:
-        f = next((n for n in node_data if n["id"] == ed["from"]), None)
-        t = next((n for n in node_data if n["id"] == ed["to"]), None)
+        f = node_by_id.get(ed["from"])
+        t = node_by_id.get(ed["to"])
         if not f or not t:
             continue
-        html_parts.append(f'<line x1="{f["x"]}" y1="{f["y"]}" x2="{t["x"]}" y2="{t["y"]}" stroke="#555" stroke-width="1.5"/>')
-        if ed["label"]:
-            html_parts.append(f'<text x="{(f["x"]+t["x"])/2:.1f}" y="{(f["y"]+t["y"])/2-6:.1f}" fill="#888" font-size="9" text-anchor="middle">{ed["label"]}</text>')
+        fg = node_group.get(ed["from"])
+        tg = node_group.get(ed["to"])
+        hidden = " wikig-edge-hidden" if (fg or tg) else ""
+        html_parts.append(
+            f'<line class="wikig-edge{hidden}" x1="{f["x"]}" y1="{f["y"]}" '
+            f'x2="{t["x"]}" y2="{t["y"]}" stroke="#555" stroke-width="1.5" data-f="{ed["from"]}" data-t="{ed["to"]}"/>'
+        )
+        # Rimuovo etichette dagli archi — saranno mostrate nella mappa connessioni sotto la descrizione
+
+    # ── Proxy edges (gruppo → esterno, visibili quando il gruppo è collassato) ──
+    for g in GROUPS:
+        gid = g["id"]
+        if gid not in group_pos:
+            continue
+        gx, gy = group_pos[gid]
+        ext_ids = set(proxy_edges[gid])
+        for ext_id in ext_ids:
+            ext = node_by_id.get(ext_id)
+            if not ext:
+                continue
+            html_parts.append(
+                f'<line class="wikig-proxy" data-group="{gid}" x1="{gx}" y1="{gy}" '
+                f'x2="{ext["x"]}" y2="{ext["y"]}" stroke="#666" stroke-width="1" stroke-dasharray="4,3"/>'
+            )
+
+    # ── Nodi gruppo (pillole arrotondate, visibili per default) ──
+    # Inline onclick/ondblclick: funzionano con innerHTML (a differenza di <script>)
+    for g in GROUPS:
+        gid = g["id"]
+        if gid not in group_pos:
+            continue
+        gx, gy = group_pos[gid]
+        col = colors.get(g["category"], "#888")
+        member_count = len([m for m in g["members"] if m in pos])
+        html_parts.append(
+            f'<g class="wikig-gnode" data-id="{gid}" data-group="{gid}" '
+            f'onclick="onGroupClick(\'{gid}\')" style="cursor:pointer">'
+            f'style="cursor:pointer">'
+            f'<rect x="{gx-55}" y="{gy-14}" width="110" height="28" rx="14" '
+            f'fill="{col}" fill-opacity="0.15" stroke="{col}" stroke-width="2" stroke-dasharray="5,3"/>'
+            f'<text x="{gx}" y="{gy+4}" fill="#eee" font-size="11" '
+            f'text-anchor="middle" font-weight="bold" font-family="monospace">{g["label"]}</text>'
+            f'<text x="{gx}" y="{gy+18}" fill="#888" font-size="8" '
+            f'text-anchor="middle" font-family="monospace">{member_count} membri</text></g>'
+        )
+
+    # ── Nodi membri (nascosti per default) ──
     for nd in node_data:
+        gid = node_group.get(nd["id"])
+        if not gid:
+            continue
+        r = 7 if nd["cat"] != "chip" else 10
+        html_parts.append(
+            f'<g class="wikig-member" data-id="{nd["id"]}" '
+            f'data-group="{gid}" style="cursor:pointer;display:none">'
+            f'<circle cx="{nd["x"]}" cy="{nd["y"]}" r="{r}" fill="{nd["color"]}" stroke="#fff" stroke-width="1.5"/>'
+            f'<text x="{nd["x"]}" y="{nd["y"]+r+10}" fill="#eee" font-size="9" '
+            f'text-anchor="middle" font-family="monospace">{nd["label"]}</text></g>'
+        )
+
+    # ── Nodi liberi (non raggruppati, sempre visibili) ──
+    for nd in node_data:
+        if nd["id"] in node_group:
+            continue
         r = 7 if nd["cat"] != "chip" else 10
         html_parts.append(
             f'<g class="wikig-node" data-id="{nd["id"]}" style="cursor:pointer">'
@@ -1684,64 +1828,305 @@ def render_wiki_graph_svg(selected_node=None):
             f'<text x="{nd["x"]}" y="{nd["y"]+r+10}" fill="#eee" font-size="9" '
             f'text-anchor="middle" font-family="monospace">{nd["label"]}</text></g>'
         )
+
+    # ── Legenda ──
+    leg_x = 10
+    leg_y = H - 30
+    for cat, col in colors.items():
+        html_parts.append(f'<circle cx="{leg_x}" cy="{leg_y}" r="5" fill="{col}"/>')
+        html_parts.append(f'<text x="{leg_x+10}" y="{leg_y+4}" fill="#aaa" font-size="9" font-family="monospace">{cat}</text>')
+        leg_x += 70
+
+    html_parts.append('</g>')
     html_parts.append('</svg>')
     html_parts.append('</div>')
-    html_parts.append(f'<div id="wikidesc" style="margin-top:8px;padding:12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:50px;color:#ccc;font-size:14px">Clicca un nodo per vedere la descrizione.</div>')
+
+    # ── Toolbar e pannello descrizione ──
+    html_parts.append(
+        '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+        '<button id="wiki-btn-collapse" style="background:#2a2a4e;color:#ccc;border:1px solid #555;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px">\u25B2 Comprimi tutti</button>'
+        '<button id="wiki-btn-expand" style="background:#2a2a4e;color:#ccc;border:1px solid #555;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px">\u25BC Espandi tutti</button>'
+        '<button id="wiki-btn-reset" style="background:#2a2a4e;color:#ccc;border:1px solid #555;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px">\u21BA Reset vista</button>'
+        '<span id="wiki-status" style="color:#888;font-size:12px;line-height:28px;margin-left:4px">0 gruppi aperti</span>'
+        '</div>'
+    )
+    html_parts.append(
+        '<div id="wikidesc" style="margin-top:6px;padding:10px 12px;border:1px solid #555;border-radius:8px;background:#16213e;min-height:40px;color:#ccc;font-size:14px">'
+        'Clicca un nodo per la descrizione, doppio click su gruppo per espanderlo/chiuderlo.'
+        '</div>'
+    )
+    html_parts.append(
+        '<div id="wikiconn" style="margin-top:6px;padding:10px 12px;border:1px solid #444;border-radius:8px;background:#1a1a2e;min-height:24px;color:#999;font-size:13px;display:none">'
+        '<div style="font-weight:bold;color:#7eb8da;margin-bottom:6px;font-size:13px">\u2194 Collegamenti</div>'
+        '<div id="wikiconn-lista"></div>'
+        '</div>'
+    )
 
     hl = ""
     if selected_node:
-        hl = f'setTimeout(function(){{showNode("{selected_node}");}},100);'
+        sg = node_group.get(selected_node)
+        if sg:
+            hl = f'setTimeout(function(){{setGroupExpanded("{sg}",true);showNode("{selected_node}");}},100);'
+        else:
+            hl = f'setTimeout(function(){{showNode("{selected_node}");}},100);'
 
-    html_parts.append(f'''<script>
-var NODES = {node_json};
+    # ── Dati embedded JSON ──
+    html_parts.append(f'<script type="application/json" id="wiki-nodes-data">{node_json}</script>')
+    html_parts.append(f'<script type="application/json" id="wiki-groups-data">{groups_json}</script>')
+    html_parts.append(f'<script type="application/json" id="wiki-edges-data">{edges_json}</script>')
+
+    # ── Bootstrap JS via <img onerror> ──
+    js_code = f"""(function(){{
+try {{
+var NODES = JSON.parse(document.getElementById('wiki-nodes-data').textContent);
+var GROUPS = JSON.parse(document.getElementById('wiki-groups-data').textContent);
+var EDGES = JSON.parse(document.getElementById('wiki-edges-data').textContent);
+var expanded = {{}};
+
+// Costruisce mappa gruppo → nodi membri e viceversa
+var nodeGroup = {{}};
+var groupMembers = {{}};
+GROUPS.forEach(function(g){{
+    groupMembers[g.id] = g.members;
+    g.members.forEach(function(mid){{ nodeGroup[mid] = g.id; }});
+}});
+// Mappa ID → label per nodi e gruppi
+var nodeLabel = {{}};
+NODES.forEach(function(n){{ nodeLabel[n.id] = n.label; }});
+GROUPS.forEach(function(g){{ nodeLabel[g.id] = g.label; }});
+
 function showNode(id){{
+    // Gruppo? (gli ID gruppo non sono in NODES)
+    var g = GROUPS.find(function(x){{return x.id==id;}});
+    if(g){{
+        document.getElementById('wikidesc').innerHTML =
+            '<b style="color:#88ccff;font-size:16px">' + g.label + '</b> ' +
+            '<span style="color:#888;font-size:10px">[gruppo ' + g.members.length + ' membri]</span><br>' +
+            '<span style="color:#ddd">' + g.desc + '</span>';
+        showConnections(id);
+        return;
+    }}
     var n = NODES.find(function(x){{return x.id==id;}});
     if(!n) return;
     document.getElementById('wikidesc').innerHTML =
-        '<b style=\"color:#88ccff;font-size:16px\">' + n.label + '</b><br>' +
-        '<span style=\"color:#aaa;font-size:12px\">' + n.cat + '</span><br>' +
-        '<span style=\"color:#ddd\">' + n.desc + '</span>';
+        '<b style="color:#88ccff;font-size:16px">' + n.label + '</b><br>' +
+        '<span style="color:#aaa;font-size:12px">' + n.cat + '</span><br>' +
+        '<span style="color:#ddd">' + n.desc + '</span>';
+    showConnections(id);
 }}
-document.querySelectorAll('#wikigrafosvg g[data-id]').forEach(function(g){{
-    g.addEventListener('click',function(){{showNode(this.getAttribute('data-id'));}});
-}});
-(function(){{
-    var svg = document.getElementById('wikigrafosvg');
-    if(!svg)return;
-    var vbox = svg.getAttribute('viewBox').split(' ').map(Number);
-    var scale = 1, tx = 0, ty = 0, dragging = false, lastX, lastY;
-    function updateView(){{
-        var w = vbox[2]*scale, h = vbox[3]*scale;
-        svg.setAttribute('viewBox',(vbox[0]+tx)+' '+(vbox[1]+ty)+' '+w+' '+h);
+
+function showConnections(id){{
+    var div = document.getElementById('wikiconn');
+    var lst = document.getElementById('wikiconn-lista');
+    if(!div || !lst) return;
+    var conns = [];
+    EDGES.forEach(function(e){{
+        if(e.from === id || e.to === id){{
+            var other = e.from === id ? e.to : e.from;
+            var dir = e.from === id ? '\u2192' : '\u2190';
+            conns.push(dir + ' ' + (nodeLabel[other] || other) + (e.label ? ' <span style=\"color:#777\">[' + e.label + ']</span>' : ''));
+        }}
+    }});
+    if(conns.length === 0){{
+        div.style.display = 'none';
+        return;
     }}
-    svg.addEventListener('wheel',function(e){{
+    lst.innerHTML = conns.join('<br>');
+    div.style.display = '';
+}}
+window.showNode = showNode;
+
+function toggleGroup(gid){{
+    expanded[gid] = !expanded[gid];
+    renderGroup(gid);
+    showStatus();
+}}
+window.toggleGroup = toggleGroup;
+
+function setGroupExpanded(gid, state){{
+    if(expanded[gid] !== state){{
+        expanded[gid] = state;
+        renderGroup(gid);
+        showStatus();
+    }}
+}}
+window.setGroupExpanded = setGroupExpanded;
+
+function collapseAll(){{
+    Object.keys(expanded).forEach(function(gid){{
+        if(expanded[gid]){{
+            expanded[gid] = false;
+            renderGroup(gid);
+        }}
+    }});
+    showStatus();
+}}
+window.collapseAll = collapseAll;
+
+function expandAll(){{
+    Object.keys(expanded).forEach(function(gid){{
+        if(!expanded[gid]){{
+            expanded[gid] = true;
+            renderGroup(gid);
+        }}
+    }});
+    showStatus();
+}}
+window.expandAll = expandAll;
+
+function showStatus(){{
+    var n = Object.keys(expanded).filter(function(g){{return expanded[g];}}).length;
+    var el = document.getElementById('wiki-status');
+    if(el) el.textContent = n + ' gruppi aperti';
+}}
+window.showStatus = showStatus;
+
+function onGroupClick(gid){{
+    if(expanded[gid]){{
+        toggleGroup(gid);
+    }}else{{
+        showNode(gid);
+    }}
+}}
+window.onGroupClick = onGroupClick;
+
+function resetGraph(){{
+    collapseAll();
+    var vp = document.getElementById('wiki-viewport');
+    if(vp) vp.setAttribute('transform', 'translate(0,0) scale(1)');
+    var desc = document.getElementById('wikidesc');
+    if(desc) desc.innerHTML = 'Clicca un nodo per la descrizione, doppio click su gruppo per espanderlo/chiuderlo.';
+    var conn = document.getElementById('wikiconn');
+    if(conn) conn.style.display = 'none';
+}}
+window.resetGraph = resetGraph;
+
+function renderGroup(gid){{
+    var isExpanded = expanded[gid];
+    var gnodes = document.querySelectorAll('.wikig-gnode[data-group="' + gid + '"]');
+    var members = document.querySelectorAll('.wikig-member[data-group="' + gid + '"]');
+    var proxies = document.querySelectorAll('.wikig-proxy[data-group="' + gid + '"]');
+
+    // Edge dove f o t e un membro del gruppo
+    groupMembers[gid].forEach(function(mid){{
+        var q = '.wikig-edge[data-f="' + mid + '"],.wikig-edge[data-t="' + mid + '"]';
+        document.querySelectorAll(q).forEach(function(el){{
+            var fg = nodeGroup[el.getAttribute('data-f')];
+            var tg = nodeGroup[el.getAttribute('data-t')];
+            var show = isExpanded;
+            if(fg && !expanded[fg]) show = false;
+            if(tg && !expanded[tg]) show = false;
+            el.classList.toggle('wikig-edge-hidden', !show);
+        }});
+    }});
+
+    if(isExpanded){{
+        gnodes.forEach(function(n){{ n.style.display = 'none'; }});
+        members.forEach(function(n){{ n.style.display = ''; }});
+        proxies.forEach(function(p){{ p.style.display = 'none'; }});
+    }}else{{
+        gnodes.forEach(function(n){{ n.style.display = ''; }});
+        members.forEach(function(n){{ n.style.display = 'none'; }});
+        proxies.forEach(function(p){{ p.style.display = ''; }});
+    }}
+}}
+
+function attachHandlers(){{
+    var svg = document.getElementById('wikigrafosvg');
+    if(!svg) return;
+    var vp = document.getElementById('wiki-viewport');
+    if(!vp) return;
+    var scale = 1, tx = 0, ty = 0;
+    var dragging = false, lastX, lastY, dragFired = false;
+
+    function upd() {{
+        vp.setAttribute('transform', 'translate(' + tx.toFixed(1) + ',' + ty.toFixed(1) + ') scale(' + scale.toFixed(4) + ')');
+    }}
+
+    function svgX(clientX) {{
+        var r = svg.getBoundingClientRect();
+        return (clientX - r.left) / r.width * 960;
+    }}
+
+    function svgY(clientY) {{
+        var r = svg.getBoundingClientRect();
+        return (clientY - r.top) / r.height * 640;
+    }}
+
+    svg.addEventListener('wheel', function(e) {{
         e.preventDefault();
-        var rect = svg.getBoundingClientRect();
-        var mx = (e.clientX - rect.left)/rect.width * vbox[2]*scale + vbox[0] + tx;
-        var my = (e.clientY - rect.top)/rect.height * vbox[3]*scale + vbox[1] + ty;
-        var factor = e.deltaY > 0 ? 1.1 : 0.9;
-        scale *= factor;
-        scale = Math.max(0.1, Math.min(10, scale));
-        updateView();
+        var mx = svgX(e.clientX), my = svgY(e.clientY);
+        var f = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+        var ns = scale * f;
+        // Centra lo zoom sulla posizione del mouse
+        tx = mx - (mx - tx) * (ns / scale);
+        ty = my - (my - ty) * (ns / scale);
+        scale = ns;
+        upd();
+    }}, {{ passive: false }});
+
+    svg.addEventListener('mousedown', function(e) {{
+        if(e.button !== 0) return;
+        dragging = true; dragFired = false; lastX = e.clientX; lastY = e.clientY;
+        svg.style.cursor = 'grabbing';
     }});
-    svg.addEventListener('mousedown',function(e){{
-        if(e.button===0){{dragging=true;lastX=e.clientX;lastY=e.clientY;svg.style.cursor='grabbing';}}
+
+    window.addEventListener('mousemove', function(e) {{
+        if(!dragging) return;
+        var px = e.clientX - lastX, py = e.clientY - lastY;
+        if(px*px + py*py > 9) dragFired = true;
+        var r = svg.getBoundingClientRect();
+        tx += px / r.width * 960;
+        ty += py / r.height * 640;
+        lastX = e.clientX; lastY = e.clientY;
+        upd();
     }});
-    window.addEventListener('mousemove',function(e){{
-        if(!dragging)return;
-        var rect = svg.getBoundingClientRect();
-        var dx = (e.clientX-lastX)/rect.width*vbox[2]*scale;
-        var dy = (e.clientY-lastY)/rect.height*vbox[3]*scale;
-        tx -= dx; ty -= dy;
-        lastX=e.clientX;lastY=e.clientY;
-        updateView();
+
+    window.addEventListener('mouseup', function() {{
+        if(dragging) {{ dragging = false; svg.style.cursor = 'grab'; }}
     }});
-    window.addEventListener('mouseup',function(){{
-        if(dragging){{dragging=false;svg.style.cursor='grab';}}
+
+    svg.addEventListener('click', function(e) {{
+        if(dragFired) return;
+        var t = e.target;
+        while(t && !t.getAttribute('data-id')) t = t.parentNode;
+        if(t && t.getAttribute('data-id')) showNode(t.getAttribute('data-id'));
     }});
-}})();
+
+    svg.addEventListener('dblclick', function(e) {{
+        var t = e.target;
+        while(t && !t.getAttribute('data-group')) t = t.parentNode;
+        if(t) toggleGroup(t.getAttribute('data-group'));
+    }});
+}}
+
+function bindToolbar(){{
+    var b = document.getElementById('wiki-btn-collapse');
+    if(b && !b._bound) {{ b.addEventListener('click', collapseAll); b._bound = true; }}
+    b = document.getElementById('wiki-btn-expand');
+    if(b && !b._bound) {{ b.addEventListener('click', expandAll); b._bound = true; }}
+    b = document.getElementById('wiki-btn-reset');
+    if(b && !b._bound) {{ b.addEventListener('click', resetGraph); b._bound = true; }}
+}}
+
+bindToolbar();
+attachHandlers();
+showStatus();
 {hl}
-</script>''')
+
+var pan = document.getElementById('wiki-pan');
+if(pan) {{
+    var obs = new MutationObserver(function() {{ setTimeout(function(){{
+        attachHandlers(); bindToolbar(); showStatus();
+    }}, 50); }});
+    obs.observe(pan, {{ childList: true, subtree: true }});
+}}
+}}catch(e){{console.error('WikiGraph:',e);}}
+}})();"""
+
+    import html as _html
+    escaped = _html.escape(js_code, quote=True)
+    html_parts.append(f'<img src="x" style="display:none" onerror="{escaped}">')
 
     return "\n".join(html_parts)
 
@@ -2339,7 +2724,7 @@ def launch_ui():
                 "Esplora le connessioni tra chip, registri, opcode e concetti del Commodore 64. "
                 "Clicca un nodo per vedere la descrizione."
             )
-            wiki_graph_html = gr.HTML(render_wiki_graph_svg())
+            wiki_graph_html = gr.HTML(render_wiki_graph_svg(), sanitize_html=False)
             wiki_search = gr.Textbox(
                 label="Cerca nodo",
                 placeholder="es. VIC-II, $D020, sprite...",
