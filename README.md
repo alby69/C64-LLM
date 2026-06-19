@@ -6,13 +6,15 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 
 - **Architettura Multi-Agente**: Researcher, Coder, Validator, e Orchestrator lavorano insieme con meccanismo di **Self-Healing**.
 - **C64 Knowledge Engine**: Sistema RAG avanzato con FAISS, embedding vettoriali e Wiki-links Obsidian.
+- **Wiki Grafo Interattivo**: Mappa concettuale SVG con 87 nodi, 105 archi, zoom/pan, gruppi collassabili multilivello e mappa connessioni.
 - **Performance Aware**: Include un **Cycle Counter** per Assembly e validazione sintattica rigorosa per BASIC v2.
 - **Configurabile & Estensibile**: Gestione tramite `agent_config.yaml` e Prompt Management System (PMS).
 
 ## 📂 Struttura del Progetto
 
-- `agent/`: Logica degli agenti e del sistema RAG.
+- `agent/`: Logica degli agenti, sistema RAG e rendering Wiki Grafo SVG.
 - `docs/`: Documentazione tecnica consolidata.
+- `data/`: Dati persistenti (PDF, dataset, modelli, grafo conoscenze).
 - `pipeline/`: Script per la preparazione del dataset e crawling proattivo.
 - `utils/`: Strumenti di validazione, cycle counting e utility.
 - `config/`: Configurazioni di sistema e sorgenti.
@@ -204,6 +206,7 @@ Il tab **Distillazione** nell'interfaccia Gradio permette di:
 ## 📖 Documentazione
 - [TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md): **Manuale Tecnico Completo.** Architettura, agenti, RAG e roadmap.
 - [UI_MANUAL.md](docs/UI_MANUAL.md): **Manuale dell'Interfaccia Utente.** Descrizione di tutti i tab e controlli.
+- [WIKI_GRAPH.md](docs/WIKI_GRAPH.md): **Tutorial Wiki Grafo.** Struttura, interazione, architettura tecnica e come aggiungere nodi/gruppi.
 - [FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md): **Fonti usate da Qwen.** KB, prompt, flusso RAG.
 - [PIANO_DISTILLAZIONE.md](docs/PIANO_DISTILLAZIONE.md): **Piano di Knowledge Distillation.** Teacher→Student, dataset, training.
 
