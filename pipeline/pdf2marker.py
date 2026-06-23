@@ -5,19 +5,27 @@ import time
 import re
 from pathlib import Path
 
-
-def convert_pdf(pdf_path, output_dest, force_ocr=False, use_llm=False):
-    ext = os.path.splitext(pdf_path)[1].lower()
-    if ext == ".pdf":
-        return _convert_with_marker(pdf_path, output_dest, force_ocr, use_llm)
-    return {"status": "error", "error": f"Unsupported format: {ext}"}
-
-
-def _convert_with_marker(pdf_path, output_dest, force_ocr=False, use_llm=False):
+_MARKER_AVAILABLE = False
+try:
     from marker.converters.pdf import PdfConverter
     from marker.models import create_model_dict
     from marker.output import text_from_rendered
+    _MARKER_AVAILABLE = True
+except ImportError:
+    pass
 
+
+def convert_pdf(pdf_path, output_dest, force_ocr=False, use_llm=False):
+    if _MARKER_AVAILABLE:
+        ext = os.path.splitext(pdf_path)[1].lower()
+        if ext == ".pdf":
+            return _convert_with_marker(pdf_path, output_dest, force_ocr, use_llm)
+        return {"status": "error", "error": f"Unsupported format: {ext}"}
+    else:
+        return _convert_with_fitz(pdf_path, output_dest)
+
+
+def _convert_with_marker(pdf_path, output_dest, force_ocr=False, use_llm=False):
     start = time.time()
 
     converter = PdfConverter(
@@ -27,9 +35,6 @@ def _convert_with_marker(pdf_path, output_dest, force_ocr=False, use_llm=False):
 
     md_text, md_metadata, md_images = text_from_rendered(rendered)
 
-    # output_dest can be:
-    #   "path/to/base"     -> produces .md, .txt, .meta.json
-    #   "path/to/file.txt" -> produces file.txt + file.md + file.meta.json (backward compat)
     if output_dest.endswith(".txt"):
         base = output_dest[:-4]
     else:
@@ -58,6 +63,38 @@ def _convert_with_marker(pdf_path, output_dest, force_ocr=False, use_llm=False):
         "markdown": md_path,
         "text": txt_path,
         "metadata": meta_path,
+        "engine": "marker-pdf",
+        "total_time": round(time.time() - start, 2),
+    }
+
+
+def _convert_with_fitz(pdf_path, output_dest):
+    import fitz
+
+    start = time.time()
+
+    doc = fitz.open(pdf_path)
+    full_text = ""
+    for page in doc:
+        blocks = page.get_text("blocks")
+        block_text = "\n".join([b[4] for b in blocks])
+        full_text += block_text + "\n\f"
+    doc.close()
+
+    if output_dest.endswith(".txt"):
+        base = output_dest[:-4]
+    else:
+        base = output_dest
+
+    txt_path = base + ".txt"
+
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write(full_text)
+
+    return {
+        "status": "ok",
+        "text": txt_path,
+        "engine": "fitz (PyMuPDF)",
         "total_time": round(time.time() - start, 2),
     }
 
@@ -74,8 +111,13 @@ def _strip_markdown(md_text):
 def main():
     if len(sys.argv) < 3:
         print("Usage: python pipeline/pdf2marker.py <input.pdf> <output>")
-        print("  output: path without extension (produces .md, .txt, .meta.json)")
-        print("       or: path ending in .txt (backward compat, produces .txt + .md + .meta.json)")
+        print("  output: path without extension (produces .md, .txt, .meta.json with marker-pdf)")
+        print("       or: path ending in .txt (produces .txt with fallback fitz)")
+        print()
+        if _MARKER_AVAILABLE:
+            print("Engine: marker-pdf (full markdown + OCR)")
+        else:
+            print("Engine: fitz/PyMuPDF (fallback — install 'pip install marker-pdf' for markdown+OCR)")
         sys.exit(1)
 
     pdf_path = sys.argv[1]
@@ -85,17 +127,14 @@ def main():
         print(f"File not found: {pdf_path}")
         sys.exit(1)
 
-    if output_dest.endswith(".txt"):
-        os.makedirs(os.path.dirname(output_dest) or ".", exist_ok=True)
-    else:
-        os.makedirs(os.path.dirname(output_dest) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(output_dest) or ".", exist_ok=True)
 
     result = convert_pdf(pdf_path, output_dest)
     if result["status"] == "ok":
-        print(f"[OK] {result['total_time']:.1f}s")
-        print(f"  Text: {result['text']}")
-        print(f"  MD:   {result['markdown']}")
-        print(f"  Meta: {result['metadata']}")
+        print(f"[OK] {result['engine']} — {result['total_time']:.1f}s")
+        for key in ("text", "markdown", "metadata"):
+            if key in result:
+                print(f"  {key}: {result[key]}")
     else:
         print(f"[ERR] {result.get('error', 'unknown error')}")
         sys.exit(1)

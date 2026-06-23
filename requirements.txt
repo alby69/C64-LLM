@@ -32,8 +32,11 @@ lxml>=4.9.0
 internetarchive>=3.0.0
 gdown>=5.2.0
 
-# PDF Extraction (marker)
-marker-pdf>=1.10.0
+# PDF Extraction — fallback: PyMuPDF (leggero, veloce da installare)
+# Per output Markdown strutturato con layout detection e OCR:
+#   pip install marker-pdf>=1.10.0   (pesante: ~2GB, installa surya-ocr + texify + torch)
+PyMuPDF>=1.23.0
+# marker-pdf>=1.10.0  # decommenta per abilitare (build +35 min)
 
 # UI
 gradio>=4.0.0

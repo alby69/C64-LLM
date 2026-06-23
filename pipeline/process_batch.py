@@ -24,10 +24,20 @@ def process_all_pdfs(base_dirs, output_dir):
         logger.info(f"Processing {basename}...")
 
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["python3", "pipeline/pdf2marker.py", pdf_path, output_base],
-                check=True, capture_output=True, text=True,
+                capture_output=True, text=True,
             )
+
+            if result.returncode != 0:
+                logger.warning(f"  pdf2marker fallito per {basename}, tento pdf2text fallback...")
+                fallback_result = subprocess.run(
+                    ["python3", "pipeline/pdf2text.py", pdf_path, output_base + ".txt"],
+                    capture_output=True, text=True,
+                )
+                if fallback_result.returncode != 0:
+                    logger.error(f"  FALLBACK FALLITO: {basename} - {fallback_result.stderr.strip()}")
+                    continue
 
             txt_path = output_base + ".txt"
             clean_path = output_base + "_clean.txt"
@@ -38,8 +48,6 @@ def process_all_pdfs(base_dirs, output_dir):
                 )
 
             logger.info(f"  OK: {basename}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"  FAILED: {basename} - {e.stderr.strip()}")
         except Exception as e:
             logger.error(f"  ERROR: {basename} - {e}")
 

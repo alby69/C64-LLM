@@ -14,7 +14,7 @@ Quando la RAG è attiva, il sistema cerca i chunk più rilevanti in un indice FA
 | `data/input/*.bas.txt` | Programmi BASIC v2 estratti da D64/G64/PRG | vari |
 | `data/input/*.ml.txt` | Codice machine language estratto | vari |
 | `data/src/*.asm` | Assembly 6502 scaricato da siti (Codebase64, 6502.org, ecc.) | vari |
-| `data/output/*.md` (da marker-pdf) | Markdown strutturato da PDF (layout detection + OCR, boost 1.2) | vari |
+| `data/output/*.md` (da marker-pdf) | Markdown strutturato da PDF (layout detection + OCR, boost 1.2; solo se marker-pdf installato) | vari |
 | `data/output/*_clean.txt` | Testo pulito da PDF tecnici C64 (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`, boost 0.3) | 58 file / 675 totali |
 | `docs/*.md` | Documentazione interna del progetto | 6 file |
 

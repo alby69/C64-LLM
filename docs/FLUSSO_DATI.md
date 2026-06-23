@@ -69,7 +69,7 @@
 | **scrape_docs.py** | Scansiona un sito, scarica PDF (segue link, evita duplicati) | `data/input/<sito>/` |
 | **c64_asm_scraper.py** | Scraping mirato su siti noti (codebase64, 6502.org, etc.) | `data/src/<sito>/` |
 | **scrape_url.py** | Scrapa un URL singolo per codice assembly | `data/src/web/` |
-| **pdf2marker.py** | Converte PDF in Markdown strutturato + testo + metadati (via marker-pdf) | `data/output/*.md`, `*.txt`, `*.meta.json` |
+| **pdf2marker.py** | Converte PDF: marker-pdf (se installato) → `.md` + `.txt` + `.meta.json`; fallback PyMuPDF → solo `.txt` | `data/output/*.md`, `*.txt`, `*.meta.json` |
 | **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
 | **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
 | **knowledge_base.py** | Costruisce indice FAISS da `.md` (knowledge_base + marker) + `.bas.txt` + `.ml.txt` + `.asm` + `data/output/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`). Marker `.md` ha source_boost=1.2, `_clean.txt` ha boost=0.3 | `data/vectorstore/` |

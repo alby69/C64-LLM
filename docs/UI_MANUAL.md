@@ -31,9 +31,9 @@ Quando la checkbox è attiva:
 4. Per ogni URL, viene eseguita la pipeline completa:
    - `scrape_docs.py` (cerca PDF nel sito)
    - `scrape_url.py` (cerca codice Assembly)
-   - Estrazione testo da PDF via pdf2marker (markdown + .txt + metadati)
+   - Estrazione testo da PDF via pdf2marker (usa marker-pdf se disponibile, altrimenti PyMuPDF)
    - Pulizia testo su .txt (`text_cleaner.py`)
-   - Inclusione .md marker (boost 1.2) e _clean.txt (boost 0.3) nella KB
+   - Inclusione .md marker (boost 1.2, solo se marker-pdf installato) e _clean.txt (boost 0.3) nella KB
    - Generazione dataset (`build_dataset.py`)
    - Rebuild Knowledge Base
 5. Il progresso viene mostrato in tempo reale nella chat

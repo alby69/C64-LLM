@@ -25,7 +25,7 @@ Specializzato nel recupero di informazioni dalla "Knowledge Engine":
 - **HyDE (Hypothetical Document Embeddings)**: Disabilitato di default (`use_hyde: false`). Il modello 1.5B generava risposte ipotetiche allucinate che peggioravano il retrieval. Sostituito da `k_results=10` e chunk più ampi.
 - **Graph Navigation**: Supporta Wiki-links in stile Obsidian per navigare tra documenti correlati (es. da "VIC-II" a "Sprite Registers").
 - **PDF filtering**: I file `data/output/*_clean.txt` sono inclusi nell'indice solo se superano un filtro keyword (≥15 termini tecnici C64), per escludere artefatti OCR di bassa qualità.
-- **Marker output (.md)**: I file `.md` prodotti da marker-pdf (layout detection, OCR, markdown strutturato) sono inclusi con source_boost=1.2, prioritari rispetto ai `_clean.txt` legacy (boost=0.3).
+- **Marker output (.md)**: I file `.md` prodotti da marker-pdf (layout detection, OCR, markdown strutturato) sono inclusi con source_boost=1.2, prioritari rispetto ai `_clean.txt` legacy (boost=0.3). Se marker-pdf non è installato, viene usato PyMuPDF come fallback (solo `.txt`, nessun `.md`).
 
 ### 2.3 CoderAgent (Sintesi di Codice)
 L'agente esecutivo che scrive il codice:

@@ -153,7 +153,11 @@ docker compose restart c64-ui
   Contenuto...
   ```
 
-**Nota importante**: I PDF vengono convertiti via **marker-pdf** che produce `.md` strutturato (con layout detection e OCR) + `.txt` + `.meta.json`. I `.md` da marker entrano nella KB con source_boost=1.2, i `_clean.txt` legacy con boost=0.3. Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `knowledge_base/` rimangono la fonte principale.
+**Nota importante**: La conversione PDF usa **pdf2marker.py** che sceglie automaticamente il motore:
+- **marker-pdf** (se installato, `pip install marker-pdf`): produce `.md` strutturato (layout detection + OCR) + `.txt` + `.meta.json`. I `.md` da marker entrano nella KB con source_boost=1.2.
+- **PyMuPDF/fitz** (default, leggero): produce solo `.txt` (nessun `.md`). I `_clean.txt` hanno boost=0.3.
+
+Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `knowledge_base/` rimangono la fonte principale. marker-pdf è ~2GB di dipendenze (surya-ocr + texify) — installalo solo se serve markdown strutturato di alta qualità.
 
 ## 🧠 Knowledge Distillation
 
