@@ -678,9 +678,9 @@ def download_and_integrate(url):
                         yield log_msg("  Estrazione testo da HTML...")
                         _extract_html_text(local, raw_path)
                     else:
-                        yield log_msg("  Estrazione testo da PDF...")
+                        yield log_msg("  Estrazione testo da PDF (marker)...")
                         yield from run_cmd_gen(
-                            f'python pipeline/pdf2text.py "{local}" "{raw_path}"'
+                            f'python pipeline/pdf2marker.py "{local}" "{raw_path}"'
                         )
 
                     if os.path.exists(raw_path):
@@ -749,13 +749,14 @@ def download_and_integrate(url):
             if pdfs:
                 combined = []
                 for i, pdf_path in enumerate(pdfs):
-                    tmp = f"data/output/raw_pdf{i}.txt"
+                    tmp_base = f"data/output/raw_pdf{i}"
                     yield log_msg(
                         f"  [{i + 1}/{len(pdfs)}] {os.path.basename(pdf_path)}"
                     )
                     yield from run_cmd_gen(
-                        f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                        f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                     )
+                    tmp = tmp_base + ".txt"
                     if os.path.exists(tmp):
                         try:
                             with open(tmp, encoding="utf-8", errors="replace") as f:
@@ -766,10 +767,11 @@ def download_and_integrate(url):
                                 yield log_msg(f"    (estrazione vuota)")
                         except Exception as e:
                             yield log_msg(f"    (errore lettura: {e})")
-                        try:
-                            os.remove(tmp)
-                        except:
-                            pass
+                        for _ext in [".txt", ".md", ".meta.json"]:
+                            try:
+                                os.remove(tmp_base + _ext)
+                            except:
+                                pass
                 if combined:
                     with open("data/output/raw.txt", "w", encoding="utf-8") as f:
                         f.write("\n\n".join(combined))
@@ -851,15 +853,20 @@ def download_and_integrate(url):
         if pdfs:
             combined = []
             for i, pdf_path in enumerate(pdfs):
-                tmp = f"data/output/raw_pdf{i}.txt"
+                tmp_base = f"data/output/raw_pdf{i}"
                 yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
                 yield from run_cmd_gen(
-                    f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                    f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                 )
+                tmp = tmp_base + ".txt"
                 if os.path.exists(tmp):
                     with open(tmp) as f:
                         combined.append(f.read())
-                    os.remove(tmp)
+                    for _ext in [".txt", ".md", ".meta.json"]:
+                        try:
+                            os.remove(tmp_base + _ext)
+                        except:
+                            pass
             with open("data/output/raw.txt", "w") as f:
                 f.write("\n\n".join(combined))
             yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
@@ -2287,15 +2294,20 @@ def launch_ui():
                 if pdfs:
                     combined = []
                     for i, pdf_path in enumerate(pdfs):
-                        tmp = f"data/output/raw_pdf{i}.txt"
+                        tmp_base = f"data/output/raw_pdf{i}"
                         yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
                         yield from run_cmd_gen(
-                            f'python pipeline/pdf2text.py "{pdf_path}" "{tmp}"'
+                            f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                         )
+                        tmp = tmp_base + ".txt"
                         if os.path.exists(tmp):
                             with open(tmp) as f:
                                 combined.append(f.read())
-                            os.remove(tmp)
+                            for _ext in [".txt", ".md", ".meta.json"]:
+                                try:
+                                    os.remove(tmp_base + _ext)
+                                except:
+                                    pass
                     with open("data/output/raw.txt", "w") as f:
                         f.write("\n\n".join(combined))
                     yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")

@@ -25,6 +25,7 @@ Specializzato nel recupero di informazioni dalla "Knowledge Engine":
 - **HyDE (Hypothetical Document Embeddings)**: Disabilitato di default (`use_hyde: false`). Il modello 1.5B generava risposte ipotetiche allucinate che peggioravano il retrieval. Sostituito da `k_results=10` e chunk più ampi.
 - **Graph Navigation**: Supporta Wiki-links in stile Obsidian per navigare tra documenti correlati (es. da "VIC-II" a "Sprite Registers").
 - **PDF filtering**: I file `data/output/*_clean.txt` sono inclusi nell'indice solo se superano un filtro keyword (≥15 termini tecnici C64), per escludere artefatti OCR di bassa qualità.
+- **Marker output (.md)**: I file `.md` prodotti da marker-pdf (layout detection, OCR, markdown strutturato) sono inclusi con source_boost=1.2, prioritari rispetto ai `_clean.txt` legacy (boost=0.3).
 
 ### 2.3 CoderAgent (Sintesi di Codice)
 L'agente esecutivo che scrive il codice:
@@ -53,8 +54,8 @@ Quando viene inserito un URL di Archive.org, il sistema:
    - `.txt`: copia diretta
    - `.epub`: decompone ZIP, estrae testo da XHTML/HTML con `HTMLParser` stdlib (fallback `pandoc`)
    - `.html`/`.htm`: pulisce tag HTML con `HTMLParser` stdlib
-   - `.pdf`: estrazione via pdf2text (come prima)
-5. **Pipeline**: text_cleaner → build_dataset → rebuild KB
+   - `.pdf`: estrazione via pdf2marker (marker-pdf: layout detection, OCR, produce .md strutturato + .txt + .meta.json)
+5. **Pipeline**: text_cleaner (solo su .txt) → build_dataset → rebuild KB (include .md da marker con boost 1.2)
 6. Gli eventuali file D64/G64/PRG vengono scaricati ed estratti in parallelo
 
 ### 2.5.2 Download da Google Drive
@@ -65,7 +66,7 @@ Quando viene inserito un URL di Google Drive (`/drive/folders/<id>`), il sistema
 3. **Scarica file per file** con `gdown.download(id, output, quiet=True)`
 4. **Fallback**: se gdown fallisce (rate limiting), riprova con `requests` su `https://drive.google.com/uc?id=<id>&export=download&confirm=t`, verificando che il content-type non sia `text/html`
 5. **Delay**: 1.5 secondi tra file per evitare rate limiting
-6. **Pipeline**: tutti i PDF scaricati vengono processati: pdf2text → text_cleaner → build_dataset → rebuild KB
+6. **Pipeline**: tutti i PDF scaricati vengono processati: pdf2marker → text_cleaner (su .txt) → build_dataset → rebuild KB (include .md da marker con boost 1.2)
 
 ### 2.5.3 Auto-elabora Link dalla Chat
 
@@ -82,8 +83,8 @@ La checkbox "Auto-elabora link" nell'interfaccia Chat attiva un flusso automatic
 Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tecnica dell'agente.
 - **Vault Obsidian**: La documentazione è strutturata in Markdown (9 manuali: `vic2_registers.md`, `raster_interrupts.md`, `sprite_programming.md`, `sid_programming.md`, `kernal_routines.md`, `6502_addressing_modes.md`, `c64_screen_routines.md`, `c64_basic_tutorial.md`, `c64_memory_map.md`) con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
-- **Pipeline**: Include strumenti di pulizia per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
-- **Inclusione PDF filtrata**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF tecnici) sono ora inclusi con filtro keyword (≥15 termini C64, >1KB). Imposta `SKIP_PDF=1` per escluderli. I `.md` curati rimangono la fonte principale.
+- **Pipeline**: Include marker-pdf per conversione PDF→Markdown con layout detection e OCR, e text_cleaner per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
+- **Inclusione PDF filtrata**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF tecnici) sono inclusi con filtro keyword (≥15 termini C64, >1KB, boost=0.3). I file `.md` prodotti da marker-pdf sono inclusi con boost 1.2, dando priorità al markdown strutturato. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati rimangono la fonte principale.
 
 ---
 

@@ -32,8 +32,8 @@ lxml>=4.9.0
 internetarchive>=3.0.0
 gdown>=5.2.0
 
-# PDF Extraction
-PyMuPDF>=1.23.0
+# PDF Extraction (marker)
+marker-pdf>=1.10.0
 
 # UI
 gradio>=4.0.0

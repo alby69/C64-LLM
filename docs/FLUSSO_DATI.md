@@ -15,8 +15,8 @@
            │ extract_d64.py  │             │              │
            │ extract_g64.py  │             ▼              │
            │ extract_prg.py  │    ┌────────────────────┐  │  ┌────────────────────────┐
-           └────────┬────────┘    │   pdf2text.py      │  │  │  c64_asm_scraper.py    │
-                    │             │  (estrazione)       │  │  │  scrape_url.py         │
+           └────────┬────────┘    │   pdf2marker.py      │  │  │  c64_asm_scraper.py    │
+                    │             │  (.md + .txt +     │  │  │  scrape_url.py         │
                     ▼             └────────┬───────────┘  │  │  (codice asm)           │
            ┌─────────────────┐             │              │  └───────────┬────────────┘
            │ data/input/     │             ▼              │              │
@@ -69,10 +69,10 @@
 | **scrape_docs.py** | Scansiona un sito, scarica PDF (segue link, evita duplicati) | `data/input/<sito>/` |
 | **c64_asm_scraper.py** | Scraping mirato su siti noti (codebase64, 6502.org, etc.) | `data/src/<sito>/` |
 | **scrape_url.py** | Scrapa un URL singolo per codice assembly | `data/src/web/` |
-| **pdf2text.py** | Estrae testo grezzo da PDF | `data/output/raw.txt` |
+| **pdf2marker.py** | Converte PDF in Markdown strutturato + testo + metadati (via marker-pdf) | `data/output/*.md`, `*.txt`, `*.meta.json` |
 | **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
 | **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
-| **knowledge_base.py** | Costruisce indice FAISS da `.md` + `.bas.txt` + `.ml.txt` + `.asm` + `data/output/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`) | `data/vectorstore/` |
+| **knowledge_base.py** | Costruisce indice FAISS da `.md` (knowledge_base + marker) + `.bas.txt` + `.ml.txt` + `.asm` + `data/output/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`). Marker `.md` ha source_boost=1.2, `_clean.txt` ha boost=0.3 | `data/vectorstore/` |
 | **estrazione EPUB** | `_extract_epub_text()` in `agent_pro.py`: decompone ZIP EPUB, estrae testo da XHTML/HTML con `HTMLParser` stdlib; fallback a `pandoc` | `data/output/raw.txt` |
 | **estrazione HTML** | `_extract_html_text()` in `agent_pro.py`: pulisce tag HTML con `HTMLParser` stdlib, ignora script/style | `data/output/raw.txt` |
 | **Google Drive** | `download_and_integrate()` enumera file con `gdown.download_folder(skip_download=True)`, poi scarica file per file. Fallback su `requests` diretto via `uc?id=` quando gdown fallisce per rate limiting. Ritardo 1.5s tra file. | `data/input/drive_<id>/` |
@@ -99,7 +99,7 @@ Archive.org  (dettaglio)   → metadata API → D64 + G64 + PRG + BEST_TEXT
                                    ├── .txt → copia diretto → text_cleaner
                                    ├── .epub → estrazione testo (stdlib) → text_cleaner
                                    ├── .html → estrazione testo (stdlib) → text_cleaner
-                                   └── .pdf → pdf2text → text_cleaner
+                                    └── .pdf → pdf2marker (.md/.txt/.meta.json) → text_cleaner (su .txt)
                                 → build_dataset → rebuild KB
 Altro URL    (sito web)    → scrape_docs.py (PDF) + scrape_url.py (ASM)
                            → + extract per ogni D64/G64/PRG trovato

@@ -26,6 +26,8 @@ class C64KnowledgeBase:
         self._dim = 384
 
     def build_index(self):
+        import time as _time
+        _t0 = _time.time()
         if not os.path.exists(self.kb_path):
             os.makedirs(self.kb_path)
 
@@ -37,7 +39,7 @@ class C64KnowledgeBase:
 
         documents = []
 
-        # Markdown con parsing frontmatter
+        print(f"  [{_time.time()-_t0:.1f}s] KB markdown...", flush=True)
         for root, _, files in os.walk(self.kb_path):
             for fname in files:
                 if not fname.endswith(".md"):
@@ -50,7 +52,7 @@ class C64KnowledgeBase:
                     if post.metadata:
                         tags = post.metadata.get("tags", [])
                         if isinstance(tags, list):
-                            content += "\nTags: " + ", ".join(tags)
+                            content += "\nTags: " + ", ".join(str(t) for t in tags)
                         elif isinstance(tags, str):
                             content += "\nTags: " + tags
                     documents.append(
@@ -62,10 +64,11 @@ class C64KnowledgeBase:
                 except Exception as e:
                     print(f"  Skipping {path}: {e}")
 
-        # PDF puliti (se SKIP_PDF non è impostato)
+        print(f"  [{_time.time()-_t0:.1f}s] PDF outputs...", flush=True)
         if not os.environ.get("SKIP_PDF"):
             self._include_pdf_outputs(documents)
 
+        print(f"  [{_time.time()-_t0:.1f}s] docs/...", flush=True)
         if os.path.exists("docs"):
             for root, _, files in os.walk("docs"):
                 for fname in files:
@@ -87,6 +90,7 @@ class C64KnowledgeBase:
                         except Exception as e:
                             print(f"  Skipping {path}: {e}")
 
+        print(f"  [{_time.time()-_t0:.1f}s] data/input + data/src...", flush=True)
         for dirname in ["data/input", "data/src"]:
             if os.path.exists(dirname):
                 for root, _, files in os.walk(dirname):
@@ -98,12 +102,10 @@ class C64KnowledgeBase:
                             continue
                         path = os.path.join(root, fname)
                         sz = os.path.getsize(path)
-                        # Salta file .asm troppo grandi (>500KB) -- non sono assembly veri
                         if fname.endswith(".asm") and sz > 500 * 1024:
                             continue
-                        # Salta file .asm che sembrano rinominati (hanno estensione doppia)
                         if fname.endswith(".asm") and re.search(
-                            r"\.(pdf|html|htm|png|jpg|jpeg|gif|zip|gz|lzh|jed|vhd|ucf|sch|brd)\.asm$",
+                            r"\.(pdf|html|htm|png|jpg|jpeg|gif|zip|gz|lzh|jed|vhd|ucf|sch|brd)(?:_[a-f0-9]+)?\.asm$",
                             fname,
                         ):
                             continue
@@ -118,14 +120,13 @@ class C64KnowledgeBase:
                         except Exception as e:
                             print(f"  Skipping {fname}: {e}")
 
-        print(f"Total documents: {len(documents)}")
+        print(f"  [{_time.time()-_t0:.1f}s] {len(documents)} docs, splitting...", flush=True)
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=2000, chunk_overlap=200, separators=["\n\n", "\n", ".", " ", ""]
         )
         docs = text_splitter.split_documents(documents)
-        print(f"Chunks: {len(docs)}")
+        print(f"  [{_time.time()-_t0:.1f}s] {len(docs)} chunks, embedding...", flush=True)
 
-        # Embed with progress
         texts = [d.page_content for d in docs]
         metadatas = [d.metadata for d in docs]
 
@@ -135,24 +136,24 @@ class C64KnowledgeBase:
             batch = texts[i : i + batch_size]
             emb = self._model.encode(batch, show_progress_bar=False)
             all_embeddings.append(emb)
-            if (i // batch_size + 1) % 5 == 0:
-                print(f"  Embedding batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
+            elapsed = _time.time() - _t0
+            print(f"  [{elapsed:.0f}s] embed batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}", flush=True)
 
         if len(all_embeddings) == 1:
             embeddings = all_embeddings[0]
         else:
             embeddings = np.concatenate(all_embeddings, axis=0)
 
-        print(f"Embeddings shape: {embeddings.shape}")
+        print(f"  [{_time.time()-_t0:.1f}s] embeddings {embeddings.shape}, building FAISS...", flush=True)
         index = faiss.IndexFlatL2(self._dim)
         index.add(embeddings.astype(np.float32))
 
-        # Save
+        print(f"  [{_time.time()-_t0:.1f}s] saving...", flush=True)
         os.makedirs(self.db_path, exist_ok=True)
         faiss.write_index(index, os.path.join(self.db_path, "index.faiss"))
         with open(os.path.join(self.db_path, "docstore.pkl"), "wb") as f:
             pickle.dump({"texts": texts, "metadatas": metadatas}, f)
-        print(f"Index built with {len(docs)} chunks.")
+        print(f"  [{_time.time()-_t0:.1f}s] Index built with {len(docs)} chunks.", flush=True)
 
     def load_index(self):
         faiss_path = os.path.join(self.db_path, "index.faiss")
@@ -182,29 +183,52 @@ class C64KnowledgeBase:
             "programmer", "reference", "programmazione",
         ]
 
-        for fname in os.listdir(output_dir):
-            if not fname.endswith("_clean.txt"):
-                continue
+        for fname in sorted(os.listdir(output_dir)):
             path = os.path.join(output_dir, fname)
-            if os.path.getsize(path) < 1024:
-                continue
-            try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-                content_lower = content.lower()
-                keyword_count = sum(1 for kw in TECH_KEYWORDS if kw in content_lower)
-                if keyword_count < 15:
+            sz = os.path.getsize(path)
+
+            if fname.endswith(".md"):
+                if sz < 512:
                     continue
-                labeled = f"Source: {fname}\n\n{content}"
-                documents.append(
-                    Document(
-                        page_content=labeled,
-                        metadata={"source": path, "type": "pdf_manual"},
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    content_lower = content.lower()
+                    keyword_count = sum(1 for kw in TECH_KEYWORDS if kw in content_lower)
+                    if keyword_count < 15:
+                        continue
+                    labeled = f"Source: {fname}\n\n{content}"
+                    documents.append(
+                        Document(
+                            page_content=labeled,
+                            metadata={"source": path, "type": "marker_md"},
+                        )
                     )
-                )
-                print(f"  Incluso: {fname} ({keyword_count} keyword tecniche)")
-            except Exception as e:
-                print(f"  Skipping {fname}: {e}")
+                    print(f"  Incluso (marker): {fname} ({keyword_count} keyword)")
+                except Exception as e:
+                    print(f"  Skipping {fname}: {e}")
+                continue
+
+            if fname.endswith("_clean.txt"):
+                if sz < 1024:
+                    continue
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    content_lower = content.lower()
+                    keyword_count = sum(1 for kw in TECH_KEYWORDS if kw in content_lower)
+                    if keyword_count < 15:
+                        continue
+                    labeled = f"Source: {fname}\n\n{content}"
+                    documents.append(
+                        Document(
+                            page_content=labeled,
+                            metadata={"source": path, "type": "pdf_manual"},
+                        )
+                    )
+                    print(f"  Incluso: {fname} ({keyword_count} keyword tecniche)")
+                except Exception as e:
+                    print(f"  Skipping {fname}: {e}")
 
     def _source_boost(self, source):
         source = source or ""
@@ -214,6 +238,8 @@ class C64KnowledgeBase:
             return 2.0
         if "docs/" in source:
             return 1.5
+        if source and (source.endswith(".md") or "marker_md" in str(source)):
+            return 1.2
         if "data/output/" in source:
             return 0.3
         return 1.0

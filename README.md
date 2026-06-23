@@ -64,12 +64,12 @@ docker compose up c64-ui
 ```
 L'interfaccia sarà disponibile su [http://localhost:7860](http://localhost:7860).
 
-### Pipeline dati (estrazione PDF → pulizia → dataset)
+### Pipeline dati (PDF → Markdown + testo → dataset)
 ```bash
 # Metti i tuoi PDF in ./data/input/
 mkdir -p data/input data/output
 
-# Esegui l'intera pipeline (PDF → dataset)
+# Esegui l'intera pipeline (PDF → dataset, via marker-pdf)
 docker compose run c64-pipeline
 
 # Oppure imposta manualmente il PDF da processare
@@ -91,11 +91,11 @@ Il modello addestrato verrà salvato in `./data/models/c64-lora-pro/`.
 
 ### Altri comandi utili
 ```bash
-# Estrarre testo da un PDF specifico
-docker compose run c64-pipeline python pipeline/pdf2text.py /app/data/input/manuale.pdf /app/data/output/raw.txt
+# Convertire PDF in Markdown + testo (via marker-pdf)
+docker compose run c64-pipeline python pipeline/pdf2marker.py /app/data/input/manuale.pdf /app/data/output/manuale
 
-# Pulire il testo estratto
-docker compose run c64-pipeline python pipeline/text_cleaner.py /app/data/output/raw.txt /app/data/output/clean.txt
+# Pulire il testo estratto (solo .txt, marker produce già .md strutturato)
+docker compose run c64-pipeline python pipeline/text_cleaner.py /app/data/output/manuale.txt /app/data/output/manuale_clean.txt
 
 # Generare dataset
 docker compose run c64-pipeline python pipeline/build_dataset.py /app/data /app/data/output/dataset_unified.jsonl
@@ -153,7 +153,7 @@ docker compose restart c64-ui
   Contenuto...
   ```
 
-**Nota importante**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF) vengono ora inclusi nell'indice FAISS con un filtro per parole chiave tecniche (≥15 match su un vocabolario C64). Per escluderli, imposta `SKIP_PDF=1` nell'ambiente. I file `.md` curati in `knowledge_base/` rimangono la fonte principale.
+**Nota importante**: I PDF vengono convertiti via **marker-pdf** che produce `.md` strutturato (con layout detection e OCR) + `.txt` + `.meta.json`. I `.md` da marker entrano nella KB con source_boost=1.2, i `_clean.txt` legacy con boost=0.3. Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `knowledge_base/` rimangono la fonte principale.
 
 ## 🧠 Knowledge Distillation
 

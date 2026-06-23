@@ -14,8 +14,8 @@ REPORT_FILE = os.path.join(LOG_DIR, "pipeline_report.txt")
 
 STEPS = [
     {
-        "name": "Estrazione PDF (PRO)",
-        "cmd": f"python pipeline/pdf2text.py {INPUT_PDF} {RAW_TEXT}",
+        "name": "Estrazione PDF (marker)",
+        "cmd": f"python pipeline/pdf2marker.py {INPUT_PDF} {RAW_TEXT}",
         "log": os.path.join(LOG_DIR, "01_pdf_extraction.log"),
     },
     {
@@ -54,7 +54,7 @@ def run_step(step):
     with open(step["log"], "w") as log_file:
         try:
             # Check if input file exists for PDF extraction
-            if "pdf2text.py" in step["cmd"]:
+            if "pdf2marker.py" in step["cmd"] or "pdf2text.py" in step["cmd"]:
                 pdf_path = step["cmd"].split()[2]
                 if not os.path.exists(pdf_path):
                     print(f"[WARN] PDF non trovato: {pdf_path}. Salto questo step.")
