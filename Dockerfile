@@ -16,6 +16,16 @@ WORKDIR /app
 # Assicura la creazione delle cartelle persistenti/data
 RUN mkdir -p data/input data/output data/tmp data/models data/src data/vectorstore knowledge_base
 
+# Layer 1: dipendenze stabili (cambiano raramente)
+RUN pip install --no-cache-dir \
+    torch>=2.0.0 \
+    transformers>=4.37.0 \
+    sentence-transformers>=2.2.0 \
+    accelerate>=0.27.0 \
+    sentencepiece>=0.1.99 \
+    numpy>=1.24.0
+
+# Layer 2: dipendenze di progetto (cambiano più spesso)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
