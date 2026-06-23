@@ -17,7 +17,8 @@ WORKDIR /app
 RUN mkdir -p data/input data/output data/tmp data/models data/src data/vectorstore knowledge_base
 
 # Layer 1: dipendenze stabili (cambiano raramente)
-RUN pip install --no-cache-dir \
+# --only-binary :all: evita compilazioni da sorgente (scikit-learn, ecc.)
+RUN pip install --no-cache-dir --only-binary :all: \
     torch>=2.0.0 \
     transformers>=4.37.0 \
     sentence-transformers>=2.2.0 \
