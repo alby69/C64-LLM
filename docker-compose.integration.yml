@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Il Core basato su C64-LLM
+  c64-core:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: c64_intelligence_core
+    volumes:
+      - ./core:/app
+      - ./tools:/app/tools          # Integrazione PYC64
+      - ./tutorial:/app/tutorial    # Integrazione C64GameTutorial
+      - ./data:/app/data
+      - ./plugins:/app/plugins      # Logica di integrazione "Cheshire-style"
+    ports:
+      - "7860:7860"
+    environment:
+      - PYTHONPATH=/app:/app/tools:/app/plugins
+      - GGUF_MODEL_PATH=/app/data/models/qwen2.5-coder-1.5b.Q4_K_M.gguf
+    restart: unless-stopped
+
+  # Servizio opzionale per la pipeline di indicizzazione (WebCrawler/RAG)
+  c64-pipeline:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: c64_intelligence_pipeline
+    volumes:
+      - ./core:/app
+      - ./tools:/app/tools
+      - ./tutorial:/app/tutorial
+      - ./data:/app/data
+    environment:
+      - PYTHONPATH=/app:/app/tools
+    command: python agent/knowledge_base.py
