@@ -11,6 +11,9 @@ rag:
   use_hyde: false
   chunk_size: 1000
   chunk_overlap: 200
+  additional_knowledge_paths:
+    - "core/knowledge_base"
+    - "tutorial/md"
 
 teacher:
   # Backend: opencode | openrouter | groq | ollama | huggingface
