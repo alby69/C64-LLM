@@ -10,7 +10,7 @@ services:
     volumes:
       - ./core:/app
       - ./tools:/app/tools          # Integrazione PYC64
-      - ./tutorial:/app/knowledge   # Integrazione C64GameTutorial come Knowledge Base
+      - ./tutorial:/app/tutorial    # Integrazione C64GameTutorial
       - ./data:/app/data
       - ./plugins:/app/plugins      # Logica di integrazione "Cheshire-style"
     ports:
@@ -29,7 +29,7 @@ services:
     volumes:
       - ./core:/app
       - ./tools:/app/tools
-      - ./tutorial:/app/knowledge
+      - ./tutorial:/app/tutorial
       - ./data:/app/data
     environment:
       - PYTHONPATH=/app:/app/tools
