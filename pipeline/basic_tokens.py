@@ -81,7 +81,7 @@ def detokenize_basic(prg_data):
                 tokens.append(f"[${b:02X}]"); i += 1
             else:
                 tokens.append(chr(b)); i += 1
-        lines.append(f"{line_num} {\"\".join(tokens)}")
+        lines.append(str(line_num) + " " + "".join(tokens))
         offset = next_line
     return "\n".join(lines)
 

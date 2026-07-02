@@ -21,6 +21,7 @@ echo "PROSSIMO PASSO: Eseguire i comandi per aggiungere i submodule:"
 echo "git submodule add https://github.com/alby69/C64-LLM core"
 echo "git submodule add https://github.com/alby69/PYC64 tools"
 echo "git submodule add https://github.com/alby69/C64GameTutorial tutorial"
+echo "git submodule add https://github.com/dj-on-github/py6502 external/py6502"
 echo ""
 
 # 4. Copia file di configurazione se presenti (simulazione)

@@ -1,6 +1,7 @@
 import re
 from utils.validate_emulator import test_asm_code
 from utils.cycle_counter import CycleCounter
+from utils.py6502_utils import C64Simulator, PurePythonAssembler
 
 class BaseLinter:
     def check(self, code):
@@ -104,6 +105,27 @@ class ValidatorAgent:
         self.basic_linters = [BasicSyntaxLinter(), BasicVariableCollisionLinter()]
         self.asm_linters = [AssemblyBranchLinter()]
         self.cycle_counter = CycleCounter()
+        try:
+            self.pure_asm = PurePythonAssembler()
+        except ImportError:
+            self.pure_asm = None
+
+    def _run_simulation(self, code):
+        """Runs a dry run of the assembly code using the pure Python simulator."""
+        try:
+            prg, msg = self.pure_asm.assemble(code)
+            if not prg:
+                return False, f"Errore Assembler (Pure Python): {msg}"
+
+            sim = C64Simulator()
+            sim.load_prg(prg)
+            success, sim_msg = sim.run(max_instructions=1000)
+            if success:
+                return True, f"Simulazione OK: {sim_msg}"
+            else:
+                return False, f"Simulazione Fallita: {sim_msg}"
+        except Exception as e:
+            return False, f"Errore durante la simulazione: {str(e)}"
 
     def validate(self, response_text):
         code_blocks = re.findall(r'```(?:assembly|asm|6502|basic)?\n(.*?)\n```', response_text, re.DOTALL | re.IGNORECASE)
@@ -114,17 +136,35 @@ class ValidatorAgent:
 
         results = []
         for code in code_blocks:
-            is_asm = any(instr in code.upper() for instr in ["LDA ", "STA ", "JSR ", "RTS", "INX"])
-            is_basic = any(instr in code.upper() for instr in ["PRINT", "GOTO", "POKE"]) or re.match(r'^\d+\s', code.strip())
+            code_upper = code.upper()
+            is_asm = any(instr in code_upper for instr in ["LDA ", "STA ", "JSR ", "RTS", "INX", "LDX ", "LDY ", "STX ", "STY ", "CMP ", "CPX ", "CPY ", "JMP "])
+            is_basic = any(instr in code_upper for instr in ["PRINT", "GOTO", "POKE"]) or re.match(r'^\d+\s', code.strip())
 
             if is_asm:
                 success, log = self._run_linters(code, self.asm_linters)
                 if success:
+                    # Pure Python Simulation first
+                    if self.pure_asm:
+                        sim_success, sim_log = self._run_simulation(code)
+                    else:
+                        sim_success, sim_log = True, "(Nota: Simulazione saltata: py6502 non trovato)"
+
+                    # Then the real assembler (ACME)
                     asm_success, asm_log = test_asm_code(code)
-                    if asm_success:
+
+                    # If ACME is missing but simulation passed, we consider it a soft pass
+                    # (this happens in environments without ACME installed)
+                    if not asm_success and "ACME assembler non trovato" in asm_log:
+                        final_success = sim_success
+                        final_log = f"{sim_log}\n(Nota: Validazione ACME saltata: ACME non installato)"
+                    else:
+                        final_success = sim_success and asm_success
+                        final_log = f"{sim_log}\n{asm_log}"
+
+                    if final_success:
                         total, _ = self.cycle_counter.estimate_cycles(code)
-                        asm_log += f"\nPerformance stimata: ~{total} cicli."
-                    results.append((asm_success, asm_log))
+                        final_log += f"\nPerformance stimata: ~{total} cicli."
+                    results.append((final_success, final_log))
                 else:
                     results.append((False, log))
             elif is_basic:

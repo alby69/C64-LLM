@@ -3,6 +3,10 @@ import sys
 import logging
 
 from pipeline.basic_tokens import detokenize_basic, is_basic_prg, hex_dump
+try:
+    from utils.py6502_utils import C64Disassembler
+except ImportError:
+    C64Disassembler = None
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("extract_prg")
@@ -45,6 +49,20 @@ def extract_prg(prg_path, output_dir):
         f.write(hex_dump(prg_data))
     log.info(f"  ML dump → {ml_out}")
     results.append(ml_out)
+
+    if C64Disassembler and not is_basic_prg(data):
+        try:
+            dis = C64Disassembler()
+            asm = dis.disassemble(prg_data, load_addr)
+            asm_out = os.path.join(output_dir, f"{safe_name}.asm")
+            with open(asm_out, "w") as f:
+                f.write(f"; Disassembly of {base_name}\n")
+                f.write(f"; Load address: ${load_addr:04X}\n\n")
+                f.write(asm)
+            log.info(f"  Disassembly → {asm_out}")
+            results.append(asm_out)
+        except Exception as e:
+            log.warning(f"  Errore disassembler: {e}")
 
     return results
 
