@@ -6,6 +6,8 @@ Questo documento rappresenta la risorsa definitiva per l'architettura, il funzio
 
 Il C64 Coding Agent è un sistema multi-agente progettato per assistere nello sviluppo di software per Commodore 64 (Assembly 6502 e BASIC v2). Combina una pipeline di dati proattiva (Crawler + RAG) con un'architettura di ragionamento strutturata (Chain-of-Thought) e un ciclo di validazione con self-healing.
 
+Per una panoramica dettagliata delle responsabilità core e del flusso dati, consultare [ARCHITETTURA_E_COMPITI.md](ARCHITETTURA_E_COMPITI.md).
+
 ---
 
 ## 2. Architettura degli Agenti

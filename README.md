@@ -209,6 +209,8 @@ Il tab **Distillazione** nell'interfaccia Gradio permette di:
 
 ## 📖 Documentazione
 - [TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md): **Manuale Tecnico Completo.** Architettura, agenti, RAG e roadmap.
+- [ARCHITETTURA_E_COMPITI.md](docs/ARCHITETTURA_E_COMPITI.md): **Responsabilità Core.** Dettaglio dei compiti del sistema.
+- [REFACTORING_PLAN.md](docs/REFACTORING_PLAN.md): **Piano di Refactoring.** Strategia per il disaccoppiamento e l'integrazione di C64-Scrapy.
 - [UI_MANUAL.md](docs/UI_MANUAL.md): **Manuale dell'Interfaccia Utente.** Descrizione di tutti i tab e controlli.
 - [WIKI_GRAPH.md](docs/WIKI_GRAPH.md): **Tutorial Wiki Grafo.** Struttura, interazione, architettura tecnica e come aggiungere nodi/gruppi.
 - [FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md): **Fonti usate da Qwen.** KB, prompt, flusso RAG.
