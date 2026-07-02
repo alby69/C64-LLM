@@ -8,6 +8,8 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 - **C64 Knowledge Engine**: Sistema RAG avanzato con FAISS, embedding vettoriali e Wiki-links Obsidian.
 - **Wiki Grafo Interattivo**: Mappa concettuale SVG con 87 nodi, 105 archi, zoom/pan, gruppi collassabili multilivello e mappa connessioni.
 - **Performance Aware**: Include un **Cycle Counter** per Assembly e validazione sintattica rigorosa per BASIC v2.
+- **Pure-Python Simulator**: Integrazione con `py6502` per "dry run" del codice Assembly generato, rilevamento loop infiniti e istruzioni illegali.
+- **Automated Disassembler**: Disassemblaggio automatico dei file `.PRG` estratti per arricchire la Knowledge Base con codice leggibile.
 - **Configurabile & Estensibile**: Gestione tramite `agent_config.yaml` e Prompt Management System (PMS).
 
 ## 📂 Struttura del Progetto
