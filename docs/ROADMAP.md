@@ -46,6 +46,11 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - [ ] **Reranking semantico**: Migliorare la precisione del RAG con un cross-encoder.
 - [ ] **HyDE (Hypothetical Document Embeddings)**: Disabilitato — il modello 1.5B generava risposte ipotetiche allucinate. Sostituito da `k_results=10` e chunk più ampi.
 - [x] **Cycle Counter per Assembly**: Analisi delle performance del codice generato. (Implementato in `utils/cycle_counter.py`)
+- [ ] **Refactoring Architetturale (Q3 2026)**:
+    - [ ] Disaccoppiamento modulo `pipeline`.
+    - [ ] Semplificazione struttura `data/`.
+    - [ ] Integrazione **C64-Scrapy** come motore di acquisizione primario.
+    - [ ] Unificazione delle logiche di crawling (Archive.org, Scrapy, Google Drive).
 
 ---
 
@@ -56,3 +61,4 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - **Fase 3: Simulazione Use Cases**: Completata (Documentati in `docs/USE_CASES.md`).
 - **Fase 4: Aggiornamento Documentazione**: Completata.
 - **Fase 5: Stabilità RAG e Robustezza (Giugno 2026)**: Completata (KB riscritta, PDF inclusi con filtro, HyDE disabilitato, k=10, chunk 2000/200, falsi `.asm` esclusi, ACME integrato, prompt rafforzato).
+- **Fase 6: Modularità e Integrazione Scrapy**: In Corso (Pianificazione completata).
