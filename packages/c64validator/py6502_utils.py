@@ -3,7 +3,7 @@ import os
 
 # Add external/py6502/src to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-py6502_path = os.path.normpath(os.path.join(current_dir, '..', 'external', 'py6502', 'src'))
+py6502_path = os.path.normpath(os.path.join(current_dir, '..', '..', 'external', 'py6502', 'src'))
 
 if py6502_path not in sys.path:
     sys.path.append(py6502_path)

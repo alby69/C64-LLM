@@ -5,37 +5,37 @@ from datetime import datetime
 # -----------------------------
 # CONFIGURAZIONE
 # -----------------------------
-INPUT_PDF = os.getenv("INPUT_PDF", "data/input/manuale.pdf")
-RAW_TEXT = "data/output/raw.txt"
-CLEAN_TEXT = "data/output/clean.txt"
-DATASET_JSONL = "data/output/dataset_unified.jsonl"
-LOG_DIR = "logs"
+INPUT_PDF = os.getenv("INPUT_PDF", "data/raw/manuale.pdf")
+RAW_TEXT = "data/logs/raw.txt"
+CLEAN_TEXT = "data/kb/clean.txt"
+DATASET_JSONL = "data/logs/dataset_unified.jsonl"
+LOG_DIR = "data/logs"
 REPORT_FILE = os.path.join(LOG_DIR, "pipeline_report.txt")
 
 STEPS = [
     {
         "name": "Estrazione PDF (marker)",
-        "cmd": f"python pipeline/pdf2marker.py {INPUT_PDF} {RAW_TEXT}",
+        "cmd": f"python pipeline/processing/pdf2marker.py {INPUT_PDF} {RAW_TEXT}",
         "log": os.path.join(LOG_DIR, "01_pdf_extraction.log"),
     },
     {
         "name": "Pulizia Testo (PRO)",
-        "cmd": f"python pipeline/text_cleaner.py {RAW_TEXT} {CLEAN_TEXT}",
+        "cmd": f"python pipeline/processing/text_cleaner.py {RAW_TEXT} {CLEAN_TEXT}",
         "log": os.path.join(LOG_DIR, "02_text_cleaning.log"),
     },
     {
         "name": "Generazione Dataset Unificato",
-        "cmd": f"python pipeline/build_dataset.py data {DATASET_JSONL}",
+        "cmd": f"python pipeline/distillation/build_dataset.py data {DATASET_JSONL}",
         "log": os.path.join(LOG_DIR, "03_dataset_gen.log"),
     },
     {
         "name": "Knowledge Distillation (opzionale — usa Teacher LLM esterno)",
-        "cmd": "python pipeline/knowledge_distiller.py --generate --max-chunks 100",
+        "cmd": "python pipeline/distillation/knowledge_distiller.py --generate --max-chunks 100",
         "log": os.path.join(LOG_DIR, "04_distillation.log"),
     },
     {
         "name": "Costruzione Knowledge Base",
-        "cmd": "python agent/knowledge_base.py",
+        "cmd": "python agent/data/kb/manuali.py",
         "log": os.path.join(LOG_DIR, "05_kb_build.log"),
     },
 ]
@@ -79,8 +79,8 @@ def run_step(step):
 
 def main():
     ensure_dir(LOG_DIR)
-    ensure_dir("data/output")
-    ensure_dir("data/src")
+    ensure_dir("data/raw")
+    ensure_dir("data/kb")
 
     report_lines = [f"Master Script Pipeline PRO - {datetime.now()}\n"]
 

@@ -7,9 +7,11 @@ __pycache__/
 .env
 .venv
 venv/
-data/
-!data/prompt_dataset.json
-!data/wiki_graph.json
+data/db/
+data/logs/
+data/raw/
+data/models/
+!data/kb/
 models/
 *.pdf
 *.jsonl

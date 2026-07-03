@@ -7,7 +7,7 @@ echo "--- Inizio Setup C64 Intelligence Ecosystem ---"
 
 # 1. Creazione struttura cartelle
 echo "Creazione struttura cartelle..."
-mkdir -p plugins data/models data/output
+mkdir -p plugins data/models data/logs
 
 # 2. Inizializzazione Git se necessario
 if [ ! -d ".git" ]; then

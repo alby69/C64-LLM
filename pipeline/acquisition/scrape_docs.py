@@ -149,7 +149,7 @@ def main():
         sys.exit(1)
 
     url = sys.argv[1].strip()
-    base_dest = sys.argv[2] if len(sys.argv) > 2 else "data/input"
+    base_dest = sys.argv[2] if len(sys.argv) > 2 else "data/raw"
 
     parsed = urlparse(url)
     domain = parsed.netloc.replace("www.", "").split(".")[0]

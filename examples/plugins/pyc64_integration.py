@@ -22,8 +22,8 @@ def build_c64_disk(prg_filename: str, disk_name: str):
     Crea un'immagine disco D64 a partire da un file PRG compilato.
     Utile per raggruppare i file per l'emulatore.
     """
-    output_path = f"data/output/{disk_name}.d64"
-    source_path = f"data/output/{prg_filename}"
+    output_path = f"data/kb/{disk_name}.d64"
+    source_path = f"data/kb/{prg_filename}"
 
     result = create_d64_from_prg(source_path, output_path)
     return f"Operazione completata tramite PYC64: {result}"

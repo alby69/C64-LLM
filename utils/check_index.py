@@ -1,6 +1,6 @@
 
 import os
-from agent.knowledge_base import C64KnowledgeBase
+from agent.data/kb/manuali import C64KnowledgeBase
 
 def list_sources():
     kb = C64KnowledgeBase()
@@ -12,7 +12,7 @@ def list_sources():
     # let's just check the files we EXPECT to be there.
 
     expected_files = []
-    for root, _, files in os.walk("knowledge_base"):
+    for root, _, files in os.walk("data/kb/manuali"):
         for f in files:
             if f.endswith(".md"):
                 expected_files.append(os.path.join(root, f))
@@ -22,7 +22,7 @@ def list_sources():
             if f.endswith(".md"):
                 expected_files.append(os.path.join(root, f))
 
-    for root, _, files in os.walk("data/output"):
+    for root, _, files in os.walk("data/kb"):
         for f in files:
             if f.endswith(".txt"):
                 expected_files.append(os.path.join(root, f))

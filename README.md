@@ -14,13 +14,14 @@ Questo progetto è un assistente alla programmazione specializzato per il **Comm
 
 ## 📂 Struttura del Progetto
 
-- `agent/`: Logica degli agenti, sistema RAG e rendering Wiki Grafo SVG.
+- `agent/`: Logica degli agenti (Orchestrator, Researcher, Validator), sistema RAG e UI Gradio.
+- `packages/`: Package condivisi dell'ecosistema (`c64validator`, `c64extractor`).
+- `pipeline/`: Package modulare per acquisizione, processamento e distillazione dei dati.
+- `data/`: Struttura dati riorganizzata (`raw/`, `kb/`, `models/`, `db/`, `logs/`).
 - `docs/`: Documentazione tecnica consolidata.
-- `data/`: Dati persistenti (PDF, dataset, modelli, grafo conoscenze).
-- `pipeline/`: Script per la preparazione del dataset e crawling proattivo.
-- `utils/`: Strumenti di validazione, cycle counting e utility.
 - `config/`: Configurazioni di sistema e sorgenti.
-- `prompts/`: Repository centrale dei prompt.
+- `prompts/`: Repository centrale dei prompt (PMS).
+- `utils/`: Utility di sistema residue.
 
 ## 🛠️ Installazione e Utilizzo
 
@@ -68,14 +69,14 @@ L'interfaccia sarà disponibile su [http://localhost:7860](http://localhost:7860
 
 ### Pipeline dati (PDF → Markdown + testo → dataset)
 ```bash
-# Metti i tuoi PDF in ./data/input/
-mkdir -p data/input data/output
+# Metti i tuoi PDF in ./data/raw/
+mkdir -p data/raw data/kb
 
 # Esegui l'intera pipeline (PDF → dataset, via marker-pdf)
 docker compose run c64-pipeline
 
 # Oppure imposta manualmente il PDF da processare
-INPUT_PDF=mio_documento.pdf docker compose up c64-pipeline
+INPUT_PDF=data/raw/mio_documento.pdf docker compose up c64-pipeline
 ```
 
 ### Training LoRA
@@ -94,32 +95,32 @@ Il modello addestrato verrà salvato in `./data/models/c64-lora-pro/`.
 ### Altri comandi utili
 ```bash
 # Convertire PDF in Markdown + testo (via marker-pdf)
-docker compose run c64-pipeline python pipeline/pdf2marker.py /app/data/input/manuale.pdf /app/data/output/manuale
+docker compose run c64-pipeline python pipeline/processing/pdf2marker.py /app/data/raw/manuale.pdf /app/data/kb/manuale
 
 # Pulire il testo estratto (solo .txt, marker produce già .md strutturato)
-docker compose run c64-pipeline python pipeline/text_cleaner.py /app/data/output/manuale.txt /app/data/output/manuale_clean.txt
+docker compose run c64-pipeline python pipeline/processing/text_cleaner.py /app/data/logs/raw.txt /app/data/kb/clean.txt
 
 # Generare dataset
-docker compose run c64-pipeline python pipeline/build_dataset.py /app/data /app/data/output/dataset_unified.jsonl
+docker compose run c64-pipeline python pipeline/distillation/build_dataset.py /app/data /app/data/logs/dataset_unified.jsonl
 
 # Costruire l'indice vettoriale (Knowledge Base)
-docker compose run c64-pipeline python agent/knowledge_base.py
+docker compose run c64-pipeline python agent/data/kb/manuali.py
 
 # Estrarre BASIC/ML da un disco D64
-docker compose run c64-pipeline python pipeline/extract_d64.py /app/data/input/disk.d64 /app/data/output/
+docker compose run c64-pipeline python -m packages.c64extractor.extract_d64 /app/data/raw/disk.d64 /app/data/kb/
 
 # Estrarre BASIC/ML da un disco G64
-docker compose run c64-pipeline python pipeline/extract_g64.py /app/data/input/disk.g64 /app/data/output/
+docker compose run c64-pipeline python -m packages.c64extractor.extract_g64 /app/data/raw/disk.g64 /app/data/kb/
 
 # Estrarre BASIC/ML da un file PRG
-docker compose run c64-pipeline python pipeline/extract_prg.py /app/data/input/program.prg /app/data/output/
+docker compose run c64-pipeline python -m packages.c64extractor.extract_prg /app/data/raw/program.prg /app/data/kb/
 
 # Eseguire i test
 docker compose run c64-pipeline python -m pytest tests/ -v
 ```
 
 ### Volume dati
-Tutti i dati persistenti (PDF, output, modelli) sono in `./data/`, montato come volume in `/app/data` nel container.
+Tutti i dati persistenti (PDF, KB, modelli, DB, log) sono in `./data/`, montato come volume in `/app/data` nel container.
 
 ## 📚 Popolare la Knowledge Base (RAG)
 
@@ -129,10 +130,10 @@ La Knowledge Base alimenta il sistema RAG con documentazione tecnica C64.
 
 ```bash
 # 1. Scarica documentazione Assembly da siti C64
-docker compose run --rm c64-pipeline python pipeline/c64_asm_scraper.py --sites 6502org codebase64 c64wiki --delay 1.5
+docker compose run --rm c64-pipeline python pipeline/acquisition/c64_asm_scraper.py --sites 6502org codebase64 c64wiki --delay 1.5
 
 # 2. Ricostruisci l'indice vettoriale
-docker compose run --rm c64-pipeline python agent/knowledge_base.py
+docker compose run --rm c64-pipeline python agent/data/kb/manuali.py
 
 # 3. Riavvia l'UI
 docker compose restart c64-ui
@@ -140,13 +141,13 @@ docker compose restart c64-ui
 
 ### Alternative per aggiungere dati
 
-- **PDF**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline`
-- **Dischi D64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_d64.py /app/data/input/disk.d64 /app/data/input/`
-- **Dischi G64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_g64.py /app/data/input/disk.g64 /app/data/input/`
-- **PRG**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_prg.py /app/data/input/program.prg /app/data/input/`
+- **PDF**: metti i file in `./data/raw/`, poi esegui `docker compose run c64-pipeline`
+- **Dischi D64**: metti i file in `./data/raw/`, poi esegui `docker compose run c64-pipeline python -m packages.c64extractor.extract_d64 /app/data/raw/disk.d64 /app/data/kb/`
+- **Dischi G64**: metti i file in `./data/raw/`, poi esegui `docker compose run c64-pipeline python -m packages.c64extractor.extract_g64 /app/data/raw/disk.g64 /app/data/kb/`
+- **PRG**: metti i file in `./data/raw/`, poi esegui `docker compose run c64-pipeline python -m packages.c64extractor.extract_prg /app/data/raw/program.prg /app/data/kb/`
 - **Archive.org (UI)**: inserisci l'URL dell'item (es. `https://archive.org/details/c64-programmer-ref`).
   Il sistema seleziona automaticamente il miglior formato disponibile (TXT > EPUB > HTML > PDF) e scarica un solo file.
-- **Markdown manuali**: crea file `.md` in `./knowledge_base/` con frontmatter YAML:
+- **Markdown manuali**: crea file `.md` in `./data/kb/manuali/` con frontmatter YAML:
   ```markdown
   ---
   title: "Nome Documento"
@@ -159,7 +160,7 @@ docker compose restart c64-ui
 - **marker-pdf** (se installato, `pip install marker-pdf`): produce `.md` strutturato (layout detection + OCR) + `.txt` + `.meta.json`. I `.md` da marker entrano nella KB con source_boost=1.2.
 - **PyMuPDF/fitz** (default, leggero): produce solo `.txt` (nessun `.md`). I `_clean.txt` hanno boost=0.3.
 
-Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `knowledge_base/` rimangono la fonte principale. marker-pdf è ~2GB di dipendenze (surya-ocr + texify) — installalo solo se serve markdown strutturato di alta qualità.
+Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `data/kb/manuali/` rimangono la fonte principale. marker-pdf è ~2GB di dipendenze (surya-ocr + texify) — installalo solo se serve markdown strutturato di alta qualità.
 
 ## 🧠 Knowledge Distillation
 
@@ -172,7 +173,7 @@ Teacher LLM (OpenCode / Groq / OpenRouter / Ollama)
        │  Legge la Knowledge Base
        │  Genera QA sintetiche (factual, code, explain, bugfix, theory)
        ▼
-Dataset distillato (data/output/distill_dataset.jsonl)
+Dataset distillato (data/kb/distill_dataset.jsonl)
        │
        ▼
 LoRA Fine-tuning → Qwen specializzato (data/models/c64-lora-pro/)
@@ -180,20 +181,20 @@ LoRA Fine-tuning → Qwen specializzato (data/models/c64-lora-pro/)
 
 ### Teacher predefinito: OpenCode (gratuito)
 
-Nessuna API key. L'assistente OpenCode legge la KB e genera il dataset. Sono già state generate **76 QA pairs** che coprono tutti i 10 file KB.
+Nessuna API key. L'assistente OpenCode legge la KB e genera il dataset. Sono già state generate **76 QA pairs** che coprono i file nella Knowledge Base.
 
 ### Altri backend Teacher
 
 | Backend | Comando |
 |---------|---------|
-| **Groq** (gratuito) | `python pipeline/knowledge_distiller.py --teacher groq --generate` |
-| **OpenRouter** | `python pipeline/knowledge_distiller.py --teacher openrouter --model qwen/qwen3-32b --generate` |
-| **Ollama** | `python pipeline/knowledge_distiller.py --teacher ollama --model qwen3:32b --generate` |
+| **Groq** (gratuito) | `python pipeline/distillation/knowledge_distiller.py --teacher groq --generate` |
+| **OpenRouter** | `python pipeline/distillation/knowledge_distiller.py --teacher openrouter --model qwen/qwen3-32b --generate` |
+| **Ollama** | `python pipeline/distillation/knowledge_distiller.py --teacher ollama --model qwen3:32b --generate` |
 
 ### Addestramento
 
 ```bash
-python pipeline/train_lora.py data/output/distill_dataset.jsonl
+python pipeline/distillation/train_lora.py data/logs/distill_dataset.jsonl
 ```
 
 ### UI

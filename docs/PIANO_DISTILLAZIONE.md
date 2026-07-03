@@ -29,7 +29,7 @@ DOPO (RAG + LoRA):
 | `pipeline/knowledge_distiller.py` | Orchestratore: Teacher backends + generazione dataset + chunk loader |
 | `config/teacher_config.yaml` | Configurazione Teacher (backend, modello, strategia) |
 | `prompts/distill_prompts.yaml` | Template per ogni tipo di dato sintetico |
-| `data/output/distill_dataset.jsonl` | Dataset generato (55+ QA pairs, copre tutte le KB) |
+| `data/kb/data/logs/distill_dataset.jsonl` | Dataset generato (55+ QA pairs, copre tutte le KB) |
 
 ### Componenti modificati
 
@@ -115,7 +115,7 @@ Lingue: italiano (~70%) e inglese (~30%).
 ### Addestrare Qwen con il dataset già generato
 
 ```bash
-python pipeline/train_lora.py data/output/distill_dataset.jsonl
+python pipeline/train_lora.py data/kb/data/logs/distill_dataset.jsonl
 ```
 
 Il training:

@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WebCrawlerAgent")
 
 class WebCrawlerAgent:
-    def __init__(self, model_backend=None, kb_path="knowledge_base", config_path="config/crawler_sources.yaml"):
+    def __init__(self, model_backend=None, kb_path="data/kb", config_path="config/crawler_sources.yaml"):
         self.backend = model_backend
         self.pm = PromptManager()
         self.kb_path = Path(kb_path)
@@ -21,7 +21,7 @@ class WebCrawlerAgent:
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Cartella temporanea per download
-        self.tmp_path = Path("data/tmp")
+        self.tmp_path = Path("data/raw/.tmp")
         self.tmp_path.mkdir(parents=True, exist_ok=True)
 
         self.sources = self._load_sources()

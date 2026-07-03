@@ -1,7 +1,7 @@
 import os
 import frontmatter
 from langchain_core.documents import Document
-from agent.knowledge_base import C64KnowledgeBase
+from agent.data/kb/manuali import C64KnowledgeBase
 
 class EcosystemKnowledgeBase(C64KnowledgeBase):
     """
@@ -9,7 +9,7 @@ class EcosystemKnowledgeBase(C64KnowledgeBase):
     dall'ecosistema C64 Intelligence SDK.
     """
 
-    def __init__(self, kb_path="knowledge_base", db_path="data/vectorstore", extra_paths=None):
+    def __init__(self, kb_path="data/kb/manuali", db_path="data/db/faiss", extra_paths=None):
         super().__init__(kb_path, db_path)
         self.extra_paths = extra_paths or []
         # Aggiunge automaticamente la cartella tutorial se presente (Docker/Submodule)

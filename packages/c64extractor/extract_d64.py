@@ -3,7 +3,7 @@ import sys
 import re
 import logging
 
-from pipeline.basic_tokens import BASIC_TOKENS, detokenize_basic
+from packages.c64extractor.basic_tokens import BASIC_TOKENS, detokenize_basic
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("extract_d64")
@@ -132,7 +132,7 @@ def main():
         sys.exit(1)
 
     d64_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/input"
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/raw"
     os.makedirs(output_dir, exist_ok=True)
 
     extracted = extract_d64(d64_path, output_dir)

@@ -91,7 +91,7 @@ def check_deps():
 
 
 def clone_repo(name: str, url: str, base_dir: Path) -> bool:
-    """Clona o aggiorna un repository direttamente in data/src/[name]."""
+    """Clona o aggiorna un repository direttamente in data/raw/[name]."""
     dest = base_dir / name
     
     if (dest / ".git").exists():
@@ -244,7 +244,7 @@ Generato il: {time.strftime("%Y-%m-%d %H:%M:%S")}
 
 def main():
     parser = argparse.ArgumentParser(description="Clona repo GitHub / Estrae file ASM / Crea dataset")
-    parser.add_argument("--output", "-o", default="./data/src", help="Cartella di output")
+    parser.add_argument("--output", "-o", default="./data/raw", help="Cartella di output")
     parser.add_argument("--delay", "-d", type=float, default=1.0, help="Ritardo tra clone (secondi)")
     args = parser.parse_args()
     

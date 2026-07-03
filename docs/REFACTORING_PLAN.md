@@ -13,10 +13,10 @@ Questo documento delinea la strategia per un refactoring pesante di C64-LLM, vol
 
 La cartella `data/` verrà riorganizzata come segue:
 
-- `data/raw/`: Tutti i file originali non elaborati (PDF, D64, G64, PRG). Sostituisce `data/input/`.
-- `data/kb/`: Documenti Markdown pronti per il RAG. Include l'output di Scrapy, Marker e i manuali curati. Sostituisce `data/output/` e integra `knowledge_base/`.
+- `data/raw/`: Tutti i file originali non elaborati (PDF, D64, G64, PRG). Sostituisce `data/raw/`.
+- `data/kb/`: Documenti Markdown pronti per il RAG. Include l'output di Scrapy, Marker e i manuali curati. Sostituisce `data/kb/` e integra `data/kb/manuali/`.
 - `data/models/`: Modelli GGUF, LoRA adapter e configurazioni del backend.
-- `data/db/`: Database vettoriale FAISS e metadati persistenti. Sostituisce `data/vectorstore/`.
+- `data/db/`: Database vettoriale FAISS e metadati persistenti. Sostituisce `data/db/faiss/`.
 - `data/logs/`: Log di esecuzione e stati dei crawler.
 
 **Nota**: Le cartelle `tmp/` e `src/` verranno eliminate. I download temporanei andranno in `data/raw/.tmp/`.
@@ -45,7 +45,7 @@ pipeline/
 ## 4. Disaccoppiamento degli Agenti
 
 - **WebCrawlerAgent**: Verrà rimosso da `agent/` e le sue funzionalità spostate in `pipeline/acquisition/`. L'agente Orchestrator richiamerà le API del modulo acquisition.
-- **RAG Engine**: `agent/knowledge_base.py` verrà semplificato per concentrarsi solo sull'indicizzazione di `data/kb/`, delegando tutto il processamento preventivo al modulo `processing`.
+- **RAG Engine**: `agent/data/kb/manuali.py` verrà semplificato per concentrarsi solo sull'indicizzazione di `data/kb/`, delegando tutto il processamento preventivo al modulo `processing`.
 
 ## 5. Fasi di Implementazione
 

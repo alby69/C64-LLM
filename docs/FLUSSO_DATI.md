@@ -19,10 +19,10 @@
                     │             │  (.md + .txt +     │  │  │  scrape_url.py         │
                     ▼             └────────┬───────────┘  │  │  (codice asm)           │
            ┌─────────────────┐             │              │  └───────────┬────────────┘
-           │ data/input/     │             ▼              │              │
+           │ data/raw/     │             ▼              │              │
            │ <item_id>/      │    ┌────────────────────┐  │              ▼
            │  *.bas.txt      │    │  text_cleaner      │  │    ┌──────────────────┐
-           │  *.ml.txt       │    │  (pulizia)         │  │    │  data/src/       │
+           │  *.ml.txt       │    │  (pulizia)         │  │    │  data/raw/       │
            │  *.pdf          │    └────────┬───────────┘  │    │  (file .asm)     │
            └────────┬────────┘             │              │    └────────┬─────────┘
                     │                      ▼              │              │
@@ -32,7 +32,7 @@
                     │                     │                              │
                     ▼                     ▼                              ▼
            ┌─────────────────┐  ┌──────────────────────┐    ┌─────────────────────┐
-           │  knowledge_base │  │  build_dataset       │    │ knowledge_base/     │
+           │  data/kb/manuali │  │  build_dataset       │    │ data/kb/manuali/     │
            │  .py            │  │  (QA pairs)          │    │ (file .md con       │
             │  carica .bas.txt│  └────────┬─────────────┘    │  frontmatter)       │
             │  .ml.txt .md    │           │                  │  + tutorial BASIC   │
@@ -47,7 +47,7 @@
                     ▼                      ▼                           ▼
            ┌──────────────────────────────────────────────────────────────────────┐
            │                    INDICE VETTORIALE FAISS                            │
-           │                    data/vectorstore/                                  │
+           │                    data/db/faiss/                                  │
            └──────────────────────────────────┬───────────────────────────────────┘
                                                │
                                                ▼
@@ -62,22 +62,22 @@
 
 | Passaggio | Descrizione | Output |
 |-----------|-------------|--------|
-| **extract_d64.py** | Legge un D64, elenca directory, estrae PRG, detokenizza BASIC v2 | `data/input/<item_id>/<nome>.bas.txt` |
-| **extract_g64.py** | Legge un G64, decodifica GCR, ricostruisce directory, estrae PRG | `data/input/<item_id>/<nome>.bas.txt`, `*.ml.txt` |
-| **extract_prg.py** | Legge un PRG, tenta detokenize BASIC, produce hex dump per ML | `data/input/<nome>.bas.txt`, `*.ml.txt` |
+| **extract_d64.py** | Legge un D64, elenca directory, estrae PRG, detokenizza BASIC v2 | `data/raw/<item_id>/<nome>.bas.txt` |
+| **extract_g64.py** | Legge un G64, decodifica GCR, ricostruisce directory, estrae PRG | `data/raw/<item_id>/<nome>.bas.txt`, `*.ml.txt` |
+| **extract_prg.py** | Legge un PRG, tenta detokenize BASIC, produce hex dump per ML | `data/raw/<nome>.bas.txt`, `*.ml.txt` |
 | **basic_tokens.py** | Modulo condiviso: tabella token BASIC v2 + detokenize + hex_dump + is_basic_prg | (libreria) |
-| **scrape_docs.py** | Scansiona un sito, scarica PDF (segue link, evita duplicati) | `data/input/<sito>/` |
-| **c64_asm_scraper.py** | Scraping mirato su siti noti (codebase64, 6502.org, etc.) | `data/src/<sito>/` |
-| **scrape_url.py** | Scrapa un URL singolo per codice assembly | `data/src/web/` |
-| **pdf2marker.py** | Converte PDF: marker-pdf (se installato) → `.md` + `.txt` + `.meta.json`; fallback PyMuPDF → solo `.txt` | `data/output/*.md`, `*.txt`, `*.meta.json` |
-| **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/output/clean.txt` |
-| **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/output/dataset_unified.jsonl` |
-| **knowledge_base.py** | Costruisce indice FAISS da `.md` (knowledge_base + marker) + `.bas.txt` + `.ml.txt` + `.asm` + `data/output/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`). Marker `.md` ha source_boost=1.2, `_clean.txt` ha boost=0.3 | `data/vectorstore/` |
-| **estrazione EPUB** | `_extract_epub_text()` in `agent_pro.py`: decompone ZIP EPUB, estrae testo da XHTML/HTML con `HTMLParser` stdlib; fallback a `pandoc` | `data/output/raw.txt` |
-| **estrazione HTML** | `_extract_html_text()` in `agent_pro.py`: pulisce tag HTML con `HTMLParser` stdlib, ignora script/style | `data/output/raw.txt` |
-| **Google Drive** | `download_and_integrate()` enumera file con `gdown.download_folder(skip_download=True)`, poi scarica file per file. Fallback su `requests` diretto via `uc?id=` quando gdown fallisce per rate limiting. Ritardo 1.5s tra file. | `data/input/drive_<id>/` |
+| **scrape_docs.py** | Scansiona un sito, scarica PDF (segue link, evita duplicati) | `data/raw/<sito>/` |
+| **c64_asm_scraper.py** | Scraping mirato su siti noti (codebase64, 6502.org, etc.) | `data/raw/<sito>/` |
+| **scrape_url.py** | Scrapa un URL singolo per codice assembly | `data/raw/web/` |
+| **pdf2marker.py** | Converte PDF: marker-pdf (se installato) → `.md` + `.txt` + `.meta.json`; fallback PyMuPDF → solo `.txt` | `data/kb/*.md`, `*.txt`, `*.meta.json` |
+| **text_cleaner.py** | Pulisce il testo (rimuove header/footer/rumore) | `data/kb/clean.txt` |
+| **build_dataset.py** | Genera coppie Q/A dal testo pulito | `data/kb/dataset_unified.jsonl` |
+| **data/kb/manuali.py** | Costruisce indice FAISS da `.md` (data/kb/manuali + marker) + `.bas.txt` + `.ml.txt` + `.asm` + `data/kb/*_clean.txt` (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`). Marker `.md` ha source_boost=1.2, `_clean.txt` ha boost=0.3 | `data/db/faiss/` |
+| **estrazione EPUB** | `_extract_epub_text()` in `agent_pro.py`: decompone ZIP EPUB, estrae testo da XHTML/HTML con `HTMLParser` stdlib; fallback a `pandoc` | `data/kb/raw.txt` |
+| **estrazione HTML** | `_extract_html_text()` in `agent_pro.py`: pulisce tag HTML con `HTMLParser` stdlib, ignora script/style | `data/kb/raw.txt` |
+| **Google Drive** | `download_and_integrate()` enumera file con `gdown.download_folder(skip_download=True)`, poi scarica file per file. Fallback su `requests` diretto via `uc?id=` quando gdown fallisce per rate limiting. Ritardo 1.5s tra file. | `data/raw/drive_<id>/` |
 | **Auto-elabora link dalla chat** | Spunta "Auto-elabora link" nella Chat: estrae URL da messaggio e risposta, aggiunge a `custom_sites.json`, avvia `download_and_integrate()` per ogni URL | Aggiunge siti + pipeline completa |
-| **Chunking** | `RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)` con separatori `["\n\n", "\n", ".", " ", ""]` | `data/vectorstore/` |
+| **Chunking** | `RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)` con separatori `["\n\n", "\n", ".", " ", ""]` | `data/db/faiss/` |
 | **prompts/prompts.yaml** | Template prompt per researcher, coder, orchestrator, crawler | (config) |
 | **config/agent_config.yaml** | Config agente: tentativi, temperatura, RAG parametri | (config) |
 
@@ -118,7 +118,7 @@ Selezione checkbox siti predefiniti/personalizzati
 ### Solo training
 
 ```
-PDF in data/input/ → docker compose run c64-pipeline
+PDF in data/raw/ → docker compose run c64-pipeline
                    → docker compose up c64-train
 ```
 
@@ -134,9 +134,9 @@ PDF in data/input/ → docker compose run c64-pipeline
 ### Tab Dati — Esplora file KB
 
 Pulsante **Elenca tutti i file**: mostra ricorsivamente tutti i file in:
-- `knowledge_base/` — file `.md` con frontmatter (tutorial, documentazione)
-- `data/input/` — file estratti `.bas.txt`, `.ml.txt`, `.pdf`
-- `data/src/` — file scraper `.asm`
+- `data/kb/manuali/` — file `.md` con frontmatter (tutorial, documentazione)
+- `data/raw/` — file estratti `.bas.txt`, `.ml.txt`, `.pdf`
+- `data/raw/` — file scraper `.asm`
 
 **Cerca file** (Textbox + pulsante): filtra i file per nome (case-insensitive) per verificare
 se un file è già presente nella KB. Mostra risultati raggruppati per directory con conteggio e dimensioni.
@@ -167,7 +167,7 @@ Il prompt di sistema per il coder (`coder.base.system`) è stato rafforzato per 
 
 - La **KB** (indice FAISS) serve solo per la **ricerca RAG durante la chat**. Non influisce sul modello.
 - Il **training LoRA** usa `distill_dataset.jsonl` (non `dataset_unified.jsonl`), non la KB.
-- I file `data/output/*_clean.txt` (estrazioni OCR da PDF) sono ora inclusi nell'indice FAISS con filtro keyword (≥15 termini tecnici C64, >1KB) — risolve le allucinazioni filtrando solo testi OCR di qualità sufficiente. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati in `knowledge_base/` rimangono la fonte principale.
+- I file `data/kb/*_clean.txt` (estrazioni OCR da PDF) sono ora inclusi nell'indice FAISS con filtro keyword (≥15 termini tecnici C64, >1KB) — risolve le allucinazioni filtrando solo testi OCR di qualità sufficiente. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati in `data/kb/manuali/` rimangono la fonte principale.
 - `extract_g64.py` usa decodifica GCR nibble-to-nibble, supporta immagini G64 standard a 35-40 tracce.
 - `extract_prg.py` riconosce automaticamente BASIC (detokenize) vs ML (hex dump).
 - I file `.bas.txt` e `.ml.txt` vengono automaticamente inclusi nell'indice FAISS.

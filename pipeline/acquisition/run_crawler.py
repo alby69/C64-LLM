@@ -5,7 +5,7 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("run_crawler")
-from agent.crawler import WebCrawlerAgent
+from pipeline.acquisition.crawler import WebCrawlerAgent
 
 class MockBackend:
     def generate(self, prompt, **kwargs):
@@ -14,7 +14,7 @@ class MockBackend:
 from datetime import datetime
 
 def extract_with_marker(pdf_path):
-    from pipeline.pdf2marker import convert_pdf
+    from pipeline.processing.pdf2marker import convert_pdf
     result = convert_pdf(str(pdf_path), str(pdf_path).replace(".pdf", ""))
     if result["status"] == "ok":
         with open(result["text"], "r", encoding="utf-8") as f:
@@ -32,7 +32,7 @@ def run_crawler_pipeline(query=None, limit=1):
         results = crawler.search_archive_org(query=query, limit=limit)
 
     for item in results:
-        tmp_dir = Path("data/tmp")
+        tmp_dir = Path("data/raw/.tmp")
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
         pdf_path = crawler.download_archive_pdf(item['id'], str(tmp_dir / item['id']))

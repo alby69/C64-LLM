@@ -1,7 +1,7 @@
 import re
 from utils.validate_emulator import test_asm_code
-from utils.cycle_counter import CycleCounter
-from utils.py6502_utils import C64Simulator, PurePythonAssembler
+from packages.c64validator.cycle_counter import CycleCounter
+from packages.c64validator.py6502_utils import C64Simulator, PurePythonAssembler
 
 class BaseLinter:
     def check(self, code):

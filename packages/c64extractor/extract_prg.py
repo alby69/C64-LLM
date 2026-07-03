@@ -2,9 +2,9 @@ import os
 import sys
 import logging
 
-from pipeline.basic_tokens import detokenize_basic, is_basic_prg, hex_dump
+from packages.c64extractor.basic_tokens import detokenize_basic, is_basic_prg, hex_dump
 try:
-    from utils.py6502_utils import C64Disassembler
+    from packages.c64validator.py6502_utils import C64Disassembler
 except ImportError:
     C64Disassembler = None
 
@@ -73,7 +73,7 @@ def main():
         sys.exit(1)
 
     prg_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/input"
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/raw"
     os.makedirs(output_dir, exist_ok=True)
 
     extracted = extract_prg(prg_path, output_dir)

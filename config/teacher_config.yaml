@@ -1,7 +1,7 @@
 teacher:
   dataset_prefix: distill_dataset
   model: ''
-  output_dir: data/output
+  output_dir: data/logs
   quality:
     min_output_length: 20
     test_assembly: true

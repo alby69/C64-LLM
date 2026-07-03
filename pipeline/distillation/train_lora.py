@@ -22,7 +22,7 @@ CPU_MAX_SEQ = 512
 default_max_seq = CPU_MAX_SEQ if IS_CPU else 2048
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-Coder-0.5B-Instruct")
 DATASET_PATH = (
-    sys.argv[1] if len(sys.argv) > 1 else "./data/output/dataset_unified.jsonl"
+    sys.argv[1] if len(sys.argv) > 1 else "./data/logs/dataset_unified.jsonl"
 )
 VAL_DATASET_PATH = sys.argv[2] if len(sys.argv) > 2 else None
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data/models/c64-lora-pro")

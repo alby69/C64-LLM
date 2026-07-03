@@ -4,7 +4,7 @@ import re
 import struct
 import logging
 
-from pipeline.basic_tokens import detokenize_basic, hex_dump
+from packages.c64extractor.basic_tokens import detokenize_basic, hex_dump
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("extract_g64")
@@ -252,7 +252,7 @@ def main():
         print("Usage: python pipeline/extract_g64.py <file.g64> [output_dir]")
         sys.exit(1)
     g64_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/input"
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else "data/raw"
     os.makedirs(output_dir, exist_ok=True)
     extracted = extract_g64(g64_path, output_dir)
     log.info(f"\nEstratti {len(extracted)} file.")
