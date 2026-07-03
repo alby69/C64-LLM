@@ -1,4 +1,4 @@
-from utils.py6502_utils import C64Simulator, PurePythonAssembler, C64Disassembler
+from packages.c64validator.py6502_utils import C64Simulator, PurePythonAssembler, C64Disassembler
 
 def test_integration():
     print("Testing Assembler...")

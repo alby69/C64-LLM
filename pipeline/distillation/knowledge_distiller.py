@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 CONFIG_PATH = "config/teacher_config.yaml"
 PROMPTS_PATH = "prompts/distill_prompts.yaml"
-KB_DIRS = ["knowledge_base", "data/output", "data/input", "data/src", "docs"]
+KB_DIRS = ["data/kb", "data/raw", "docs"]
 SKIP_EXTS = {
     ".gz",
     ".zip",
@@ -282,7 +282,7 @@ class KnowledgeDistiller:
             {
                 "instruction": "Quale registro VIC-II controlla il colore del bordo?",
                 "output": "Il registro $D020 del VIC-II controlla il colore del bordo del C64.",
-                "source": "knowledge_base/c64_memory_map.md",
+                "source": "data/kb/manuali/c64_memory_map.md",
                 "type": "factual",
                 "lang": "it",
             }
@@ -319,7 +319,7 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        default="data/output/distill_dataset.jsonl",
+        default="data/logs/distill_dataset.jsonl",
         help="File output dataset",
     )
     parser.add_argument(

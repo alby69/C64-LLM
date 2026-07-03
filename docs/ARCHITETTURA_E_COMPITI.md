@@ -7,15 +7,14 @@ Questo documento descrive in dettaglio le responsabilità e l'organizzazione att
 C64-LLM non è un semplice modello linguistico, ma un ecosistema completo per lo sviluppo e la preservazione del software Commodore 64. I suoi compiti principali sono suddivisi in cinque aree funzionali:
 
 ### 1.1 Acquisizione della Conoscenza (Data Acquisition)
-- **Scraping Mirato**: Estrazione di codice Assembly da fonti autorevoli (Codebase64, 6502.org) tramite `c64_asm_scraper.py`.
-- **Crawling Proattivo**: Monitoraggio di Archive.org per il download di manuali tecnici e libri in formato PDF/TXT/EPUB tramite `agent/crawler.py`.
-- **Ingestion Flessibile**: Supporto per URL singoli, cartelle Google Drive e caricamento manuale di file PDF, D64, G64 e PRG.
+- **Scraping Mirato**: Estrazione di codice Assembly da fonti autorevoli tramite `pipeline/acquisition/c64_asm_scraper.py`.
+- **Crawling Proattivo**: Monitoraggio di Archive.org tramite `pipeline/acquisition/crawler.py`.
+- **Ingestion Flessibile**: Supporto per URL singoli, cartelle Google Drive e caricamento manuale.
 
 ### 1.2 Elaborazione e Trasformazione (Data Processing)
-- **Detokenizzazione BASIC**: Conversione di file binari .PRG in listati BASIC v2 leggibili.
-- **Analisi Linguaggio Macchina**: Generazione di hex dump e disassemblati di base per blocchi ML.
-- **Conversione Documentale**: Trasformazione di PDF complessi in Markdown strutturato con layout detection (via `pdf2marker.py`).
-- **Pulizia Testuale**: Normalizzazione dei testi estratti per rimuovere artefatti OCR e rumore tramite `text_cleaner.py`.
+- **Shared Packages**: Utilizzo di `packages/c64extractor` per detokenizzazione BASIC, analisi ML e gestione formati PRG/D64/G64.
+- **Conversione Documentale**: Trasformazione di PDF in Markdown strutturato via `pipeline/processing/pdf2marker.py`.
+- **Pulizia Testuale**: Normalizzazione via `pipeline/processing/text_cleaner.py`.
 
 ### 1.3 Knowledge Engine (RAG)
 - **Indicizzazione Vettoriale**: Creazione di un database FAISS utilizzando embedding `sentence-transformers` per il recupero semantico.
@@ -38,17 +37,16 @@ C64-LLM non è un semplice modello linguistico, ma un ecosistema completo per lo
 
 Il progetto presenta attualmente una struttura molto articolata, con una gestione dei dati suddivisa in diverse cartelle di transito:
 
-- `agent/`: Logica degli agenti e del sistema RAG.
-- `pipeline/`: Script per l'acquisizione e il processamento iniziale dei dati.
-- `knowledge_base/`: Manuali curati e tutorial (il "cuore" del RAG).
-- `data/`: Cartella persistente (complicata):
-    - `input/`: File grezzi caricati dall'utente o scaricati.
-    - `output/`: File processati, puliti e pronti per l'indicizzazione.
-    - `src/`: Codice sorgente ASM scaricato dagli scraper.
-    - `tmp/`: File temporanei di download.
-    - `vectorstore/`: Indice FAISS.
+- `agent/`: Logica degli agenti e UI Gradio.
+- `packages/`: Package condivisi dell'ecosistema (`c64validator`, `c64extractor`).
+- `pipeline/`: Package modulare (acquisition, processing, distillation).
+- `data/`: Struttura semplificata:
+    - `raw/`: File originali non elaborati.
+    - `kb/`: Documenti pronti per il RAG (MD/TXT).
+    - `db/`: Database vettoriale e metadati.
     - `models/`: Modelli GGUF e adapter LoRA.
-- `utils/`: Utility per validazione, cycle counting e prompt management.
+    - `logs/`: Log, dataset generati e stati dei crawler.
+- `utils/`: Utility di sistema residue.
 
 ---
 

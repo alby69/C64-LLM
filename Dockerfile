@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Assicura la creazione delle cartelle persistenti/data
-RUN mkdir -p data/input data/output data/tmp data/models data/src data/vectorstore knowledge_base
+RUN mkdir -p data/raw data/kb data/logs data/models data/db data/models data/kb/manuali
 
 # Layer 1: dipendenze stabili (cambiano raramente)
 # --only-binary :all: evita compilazioni da sorgente (scikit-learn, ecc.)

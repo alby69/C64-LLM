@@ -13,7 +13,7 @@ class C64KnowledgeBase:
         ".gz", ".gzip", ".zip", ".png", ".jpg", ".gif", ".pdf", ".d64", ".g64", ".prg",
     }
 
-    def __init__(self, kb_path="knowledge_base", db_path="data/vectorstore"):
+    def __init__(self, kb_path="data/kb", db_path="data/db/faiss"):
         self.kb_path = kb_path
         self.db_path = db_path
         self._load_embedder()
@@ -90,8 +90,8 @@ class C64KnowledgeBase:
                         except Exception as e:
                             print(f"  Skipping {path}: {e}")
 
-        print(f"  [{_time.time()-_t0:.1f}s] data/input + data/src...", flush=True)
-        for dirname in ["data/input", "data/src"]:
+        print(f"  [{_time.time()-_t0:.1f}s] data/raw...", flush=True)
+        for dirname in ["data/raw"]:
             if os.path.exists(dirname):
                 for root, _, files in os.walk(dirname):
                     for fname in files:
@@ -170,7 +170,10 @@ class C64KnowledgeBase:
             self.load_index()
 
     def _include_pdf_outputs(self, documents):
-        output_dir = "data/output"
+        # In the new structure, PDF outputs (markdown/text) are already in kb_path
+        # This method might be redundant if they are moved to data/kb
+        # But for compatibility during migration, we can check data/kb
+        output_dir = "data/kb"
         if not os.path.exists(output_dir):
             return
 
@@ -232,16 +235,16 @@ class C64KnowledgeBase:
 
     def _source_boost(self, source):
         source = source or ""
-        if "knowledge_base/" in source:
+        if "data/kb/manuali/" in source:
             return 3.0
-        if "data/src/" in source:
+        if "data/raw/" in source:
             return 2.0
         if "docs/" in source:
             return 1.5
         if source and (source.endswith(".md") or "marker_md" in str(source)):
             return 1.2
-        if "data/output/" in source:
-            return 0.3
+        if "data/kb/" in source:
+            return 0.5 # Default for other kb files
         return 1.0
 
     def query(self, text, k=10, follow_links=True):

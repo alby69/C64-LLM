@@ -89,12 +89,12 @@ Gestione dell'indice vettoriale FAISS e navigazione dei file sorgente.
 
 Pulsante **Ricostruisci Indice KB** — ricostruisce l'indice FAISS da zero leggendo:
 
-- `knowledge_base/*.md` — tutorial e documentazione con frontmatter
-- `data/input/*.bas.txt` — BASIC detokenizzato
-- `data/input/*.ml.txt` — codice macchina estratto
-- `data/src/*.asm` — Assembly scrapato dal web
+- `data/kb/manuali/*.md` — tutorial e documentazione con frontmatter
+- `data/raw/*.bas.txt` — BASIC detokenizzato
+- `data/raw/*.ml.txt` — codice macchina estratto
+- `data/raw/*.asm` — Assembly scrapato dal web
 
-**Nota**: I file `data/output/*.txt` (estrazioni OCR da PDF) NON vengono più indicizzati dalla KB — causavano allucinazioni tecniche nel modello.
+**Nota**: I file `data/kb/*.txt` (estrazioni OCR da PDF) NON vengono più indicizzati dalla KB — causavano allucinazioni tecniche nel modello.
 
 Lo splitter usa `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)` con separatori `["\\n\\n", "\\n", ".", " ", ""]`.
 
@@ -116,7 +116,7 @@ I file binari (`.gz`, `.zip`, `.png`, `.pdf`, `.d64`, ecc.) vengono saltati auto
 
 ### Esplora file KB
 
-- **Elenca tutti i file**: mostra ricorsivamente tutti i file in `knowledge_base/`, `data/input/`, `data/src/` con dimensione
+- **Elenca tutti i file**: mostra ricorsivamente tutti i file in `data/kb/manuali/`, `data/raw/`, `data/raw/` con dimensione
 - **Cerca file**: filtro case-insensitive per nome file o percorso
 - **Anteprima file**: dropdown per selezionare un file, clicca "Visualizza" per mostrare le prime 50 righe. I file binari (PDF, D64, PNG, ecc.) mostrano un messaggio "File binario" invece di crashare.
 
@@ -130,7 +130,7 @@ Interfaccia per la Knowledge Distillation: generazione di dataset sintetici da K
 
 1. **Scegli un profilo** dal dropdown "Profilo" (es. ⚡ Rapido, 🔧 Groq Veloce, 🤖 Ollama Locale) — i parametri si impostano automaticamente. Puoi modificarli manualmente e salvare il risultato come nuovo profilo con **💾 Salva**.
 2. **Configura il Teacher**: se usi `opencode` (default) nessuna API key necessaria. Per Groq/OpenRouter/HF seleziona backend, modello e inserisci la chiave.
-3. **Genera Dataset**: clicca **🚀 Genera Dataset** — il log mostra i chunk processati in tempo reale. Il dataset viene salvato in `data/output/distill_dataset.jsonl`.
+3. **Genera Dataset**: clicca **🚀 Genera Dataset** — il log mostra i chunk processati in tempo reale. Il dataset viene salvato in `data/kb/distill_dataset.jsonl`.
 4. **Addestra (LoRA)**: clicca **🏋️ Addestra (LoRA)** per avviare il training su Qwen2.5-Coder-1.5B col dataset generato. Usa **📊 Stato** per verificare entry e configurazione attiva.
 
 ### Profili di Configurazione
@@ -179,7 +179,7 @@ Il sistema a profili permette di salvare e ripristinare configurazioni complete 
 
 | Elemento | Descrizione |
 |----------|-------------|
-| **Dataset path** | Textbox con il path del dataset JSONL generato (default: `data/output/distill_dataset.jsonl`) |
+| **Dataset path** | Textbox con il path del dataset JSONL generato (default: `data/kb/distill_dataset.jsonl`) |
 | **Output dir** | Textbox con la directory di output per i checkpoint LoRA (default: `data/models/c64-lora-pro`) |
 | **Max sequence length** | Slider 512-4096: lunghezza massima delle sequenze in token (default: 512 per CPU, 2048+ per GPU) |
 | **🏋️ Addestra (LoRA)** | Pulsante per avviare il training LoRA. Mostra log in tempo reale nella textbox "Log". |
@@ -203,7 +203,7 @@ Le API key **non** vengono mai salvate nei profili per ragioni di sicurezza.
 
 ### Dataset Viewer
 
-Visualizza il contenuto di `data/output/dataset_unified.jsonl` con:
+Visualizza il contenuto di `data/kb/dataset_unified.jsonl` con:
 
 - **Paginazione**: pulsanti ◀ Precedente / Successiva ▶ (20 righe per pagina)
 - **Ricerca**: casella di testo + pulsante "Cerca" — filtra le righe per parola chiave (case-insensitive)

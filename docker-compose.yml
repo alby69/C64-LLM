@@ -10,7 +10,7 @@ services:
       - ./utils:/app/utils
       - ./config:/app/config
       - ./prompts:/app/prompts
-      - ./knowledge_base:/app/knowledge_base
+      - ./data/kb/manuali:/app/data/kb/manuali
     environment:
       - PYTHONUNBUFFERED=1
       - GGUF_MODEL_PATH=/app/data/models/qwen2.5-coder-1.5b.Q4_K_M.gguf
@@ -22,10 +22,10 @@ services:
       - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      - INPUT_PDF=/app/data/input/${INPUT_PDF:-manuale.pdf}
-      - RAW_TEXT=/app/data/output/raw.txt
-      - CLEAN_TEXT=/app/data/output/clean.txt
-      - DATASET_JSONL=/app/data/output/dataset_unified.jsonl
+      - INPUT_PDF=/app/data/raw/${INPUT_PDF:-manuale.pdf}
+      - RAW_TEXT=/app/data/kb/raw.txt
+      - CLEAN_TEXT=/app/data/kb/clean.txt
+      - DATASET_JSONL=/app/data/kb/dataset_unified.jsonl
     command: python run_pipeline.py
 
   c64-train:
@@ -39,4 +39,4 @@ services:
       resources:
         limits:
           memory: 16G
-    command: python pipeline/train_lora.py /app/data/output/dataset_unified.jsonl
+    command: python pipeline/train_lora.py /app/data/kb/dataset_unified.jsonl

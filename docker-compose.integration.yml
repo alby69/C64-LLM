@@ -33,4 +33,4 @@ services:
       - ./data:/app/data
     environment:
       - PYTHONPATH=/app:/app/tools
-    command: python agent/knowledge_base.py
+    command: python -m agent.knowledge_base

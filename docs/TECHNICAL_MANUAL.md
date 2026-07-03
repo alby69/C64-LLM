@@ -26,7 +26,7 @@ Specializzato nel recupero di informazioni dalla "Knowledge Engine":
 - **Query Expansion**: Trasforma richieste vaghe in termini tecnici C64.
 - **HyDE (Hypothetical Document Embeddings)**: Disabilitato di default (`use_hyde: false`). Il modello 1.5B generava risposte ipotetiche allucinate che peggioravano il retrieval. Sostituito da `k_results=10` e chunk più ampi.
 - **Graph Navigation**: Supporta Wiki-links in stile Obsidian per navigare tra documenti correlati (es. da "VIC-II" a "Sprite Registers").
-- **PDF filtering**: I file `data/output/*_clean.txt` sono inclusi nell'indice solo se superano un filtro keyword (≥15 termini tecnici C64), per escludere artefatti OCR di bassa qualità.
+- **PDF filtering**: I file `data/kb/*_clean.txt` sono inclusi nell'indice solo se superano un filtro keyword (≥15 termini tecnici C64), per escludere artefatti OCR di bassa qualità.
 - **Marker output (.md)**: I file `.md` prodotti da marker-pdf (layout detection, OCR, markdown strutturato) sono inclusi con source_boost=1.2, prioritari rispetto ai `_clean.txt` legacy (boost=0.3). Se marker-pdf non è installato, viene usato PyMuPDF come fallback (solo `.txt`, nessun `.md`).
 
 ### 2.3 CoderAgent (Sintesi di Codice)
@@ -86,14 +86,14 @@ Il sistema RAG (Retrieval-Augmented Generation) è il cuore della precisione tec
 - **Vault Obsidian**: La documentazione è strutturata in Markdown (9 manuali: `vic2_registers.md`, `raster_interrupts.md`, `sprite_programming.md`, `sid_programming.md`, `kernal_routines.md`, `6502_addressing_modes.md`, `c64_screen_routines.md`, `c64_basic_tutorial.md`, `c64_memory_map.md`) con frontmatter YAML per tag e categorie.
 - **Indicizzazione**: Utilizza `sentence-transformers/all-MiniLM-L6-v2` per creare embedding vettoriali memorizzati in FAISS.
 - **Pipeline**: Include marker-pdf per conversione PDF→Markdown con layout detection e OCR, e text_cleaner per normalizzare il testo estratto da PDF tecnici e magazine storici (The Transactor, Compute!, ecc.).
-- **Inclusione PDF filtrata**: I file `data/output/*_clean.txt` (estrazioni OCR da PDF tecnici) sono inclusi con filtro keyword (≥15 termini C64, >1KB, boost=0.3). I file `.md` prodotti da marker-pdf sono inclusi con boost 1.2, dando priorità al markdown strutturato. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati rimangono la fonte principale.
+- **Inclusione PDF filtrata**: I file `data/kb/*_clean.txt` (estrazioni OCR da PDF tecnici) sono inclusi con filtro keyword (≥15 termini C64, >1KB, boost=0.3). I file `.md` prodotti da marker-pdf sono inclusi con boost 1.2, dando priorità al markdown strutturato. Imposta `SKIP_PDF=1` per escluderli. I `.md` curati rimangono la fonte principale.
 
 ---
 
 ## 3.1 Knowledge Base — Ricerca File nella UI
 
 Il tab **Knowledge Base** include una sezione "Esplora file KB" con:
-- **Elenca tutti i file**: mostra ricorsivamente tutti i file in `knowledge_base/`, `data/input/`, `data/src/`
+- **Elenca tutti i file**: mostra ricorsivamente tutti i file in `data/kb/manuali/`, `data/raw/`, `data/raw/`
 - **Cerca file**: filtro case-insensitive per nome file o percorso, utile per verificare se un file è già stato inserito
 - **Anteprima file**: dropdown + pulsante per visualizzare le prime 50 righe di un file selezionato
 

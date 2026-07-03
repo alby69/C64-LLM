@@ -12,7 +12,7 @@ rag:
   chunk_size: 1000
   chunk_overlap: 200
   additional_knowledge_paths:
-    - "core/knowledge_base"
+    - "data/kb"
     - "tutorial/md"
 
 teacher:

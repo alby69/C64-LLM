@@ -27,7 +27,7 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 
 ### 3. Stabilità RAG e Robustezza (Giugno 2026)
 - [x] **Knowledge Base riscritta**: Sostituito langchain FAISS + HuggingFaceEmbeddings con FAISS diretto + sentence-transformers, risolvendo OOM e incompatibilità.
-- [x] **Inclusione PDF con filtro**: `data/output/*_clean.txt` ora indicizzato con filtro keyword (≥15 termini tecnici), risolvendo allucinazioni OCR.
+- [x] **Inclusione PDF con filtro**: `data/kb/*_clean.txt` ora indicizzato con filtro keyword (≥15 termini tecnici), risolvendo allucinazioni OCR.
 - [x] **Rimozione HyDE**: Disabilitato (`use_hyde: false`) — peggiorava il retrieval con allucinazioni del modello 1.5B.
 - [x] **k_results aumentato**: Da 3 a 10, migliorando la copertura del contesto.
 - [x] **Chunking migliorato**: `chunk_size` da 500→2000 e `chunk_overlap` da 50→200 per contesto tecnico completo.
@@ -46,11 +46,12 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - [ ] **Reranking semantico**: Migliorare la precisione del RAG con un cross-encoder.
 - [ ] **HyDE (Hypothetical Document Embeddings)**: Disabilitato — il modello 1.5B generava risposte ipotetiche allucinate. Sostituito da `k_results=10` e chunk più ampi.
 - [x] **Cycle Counter per Assembly**: Analisi delle performance del codice generato. (Implementato in `utils/cycle_counter.py`)
-- [ ] **Refactoring Architetturale (Q3 2026)**:
-    - [ ] Disaccoppiamento modulo `pipeline`.
-    - [ ] Semplificazione struttura `data/`.
+- [x] **Refactoring Architetturale (Q3 2026)**:
+    - [x] Disaccoppiamento modulo `pipeline`.
+    - [x] Semplificazione struttura `data/`.
+    - [x] Preparazione Shared Packages (`c64validator`, `c64extractor`).
     - [ ] Integrazione **C64-Scrapy** come motore di acquisizione primario.
-    - [ ] Unificazione delle logiche di crawling (Archive.org, Scrapy, Google Drive).
+    - [x] Unificazione delle logiche di crawling (Archive.org, Google Drive).
 
 ---
 
@@ -61,4 +62,4 @@ Questo documento riassume lo stato attuale del progetto e definisce le prossime 
 - **Fase 3: Simulazione Use Cases**: Completata (Documentati in `docs/USE_CASES.md`).
 - **Fase 4: Aggiornamento Documentazione**: Completata.
 - **Fase 5: Stabilità RAG e Robustezza (Giugno 2026)**: Completata (KB riscritta, PDF inclusi con filtro, HyDE disabilitato, k=10, chunk 2000/200, falsi `.asm` esclusi, ACME integrato, prompt rafforzato).
-- **Fase 6: Modularità e Integrazione Scrapy**: In Corso (Pianificazione completata).
+- **Fase 6: Modularità e Refactoring Dati**: Completata (Acquisizione/Processamento disaccoppiati, data/ raw/kb/models/db/logs).

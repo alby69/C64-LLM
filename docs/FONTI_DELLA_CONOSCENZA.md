@@ -10,21 +10,21 @@ Quando la RAG è attiva, il sistema cerca i chunk più rilevanti in un indice FA
 
 | Directory | Contenuto | Quanti |
 |-----------|-----------|--------|
-| `knowledge_base/*.md` | Manuali scritti a mano: memory map, VIC-II, SID, sprite, raster, KERNAL, BASIC tutorial, indirizzamenti 6502, routine schermo, CIA | 9 file |
-| `data/input/*.bas.txt` | Programmi BASIC v2 estratti da D64/G64/PRG | vari |
-| `data/input/*.ml.txt` | Codice machine language estratto | vari |
-| `data/src/*.asm` | Assembly 6502 scaricato da siti (Codebase64, 6502.org, ecc.) | vari |
-| `data/output/*.md` (da marker-pdf) | Markdown strutturato da PDF (layout detection + OCR, boost 1.2; solo se marker-pdf installato) | vari |
-| `data/output/*_clean.txt` | Testo pulito da PDF tecnici C64 (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`, boost 0.3) | 58 file / 675 totali |
+| `data/kb/manuali/*.md` | Manuali scritti a mano: memory map, VIC-II, SID, sprite, raster, KERNAL, BASIC tutorial, indirizzamenti 6502, routine schermo, CIA | 9 file |
+| `data/raw/*.bas.txt` | Programmi BASIC v2 estratti da D64/G64/PRG | vari |
+| `data/raw/*.ml.txt` | Codice machine language estratto | vari |
+| `data/raw/*.asm` | Assembly 6502 scaricato da siti (Codebase64, 6502.org, ecc.) | vari |
+| `data/kb/*.md` (da marker-pdf) | Markdown strutturato da PDF (layout detection + OCR, boost 1.2; solo se marker-pdf installato) | vari |
+| `data/kb/*_clean.txt` | Testo pulito da PDF tecnici C64 (filtrato: ≥15 keyword tecniche, >1KB, esclusi falsi `.asm`, boost 0.3) | 58 file / 675 totali |
 | `docs/*.md` | Documentazione interna del progetto | 6 file |
 
 ### Come viene costruito l'indice
 
 ```
-knowledge_base.py (C64KnowledgeBase.build_index())
+data/kb/manuali.py (C64KnowledgeBase.build_index())
   → sentence-transformers/all-MiniLM-L6-v2 (embedding)
   → RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
-  → FAISS vector store salvato in data/vectorstore/
+  → FAISS vector store salvato in data/db/faiss/
 ```
 
 ---
@@ -47,7 +47,7 @@ Tutti in `prompts/prompts.yaml`:
 
 | File | Ruolo |
 |------|-------|
-| `agent/knowledge_base.py` | Costruisce l'indice FAISS ed esegue la ricerca vettoriale (`C64KnowledgeBase.query()`) |
+| `agent/data/kb/manuali.py` | Costruisce l'indice FAISS ed esegue la ricerca vettoriale (`C64KnowledgeBase.query()`) |
 | `agent/researcher.py` | Query expansion, language detection, HyDE, chiamata alla Knowledge Base |
 | `agent/coder.py` | Costruisce il prompt finale (system + contesto tecnico + query) e chiama Qwen |
 | `agent/model_backend.py` | Backend di generazione: `ModelBackend` (HF Transformers) o `LlamaCppBackend` (GGUF) |
@@ -75,7 +75,7 @@ Domanda utente
 │  1. Query expansion (Qwen)                     │
 │  2. Language detection (Qwen)                  │
 │  3. FAISS similarity search sui chunk della KB │
-│     (knowledge_base/ + data/ + data/output/ +  │
+│     (data/kb/manuali/ + data/ + data/kb/ +  │
 │      docs/)                                    │
 └────────────────────┬───────────────────────────┘
                      │ contesto tecnico (chunk rilevanti)
@@ -120,11 +120,11 @@ Qwen **non** è fine-tunato di base sul C64. La conoscenza tecnica arriva intera
 
 Il training LoRA opzionale (`pipeline/train_lora.py`) addestra Qwen su `distill_dataset.jsonl`, producendo pesi specializzati in `data/models/c64-lora-pro/`. Il training rileva automaticamente CPU vs GPU: su CPU usa il modello 0.5B con `max_length=512`; su GPU usa il modello 1.5B con `max_length=2048`.
 
-#### Nota: inclusione di `data/output/*_clean.txt` nella KB (giugno 2026)
-I file `data/output/*_clean.txt` (testo pulito da PDF tecnici C64) sono ora inclusi nell'indice FAISS con un filtro:
+#### Nota: inclusione di `data/kb/*_clean.txt` nella KB (giugno 2026)
+I file `data/kb/*_clean.txt` (testo pulito da PDF tecnici C64) sono ora inclusi nell'indice FAISS con un filtro:
 - **≥15 keyword tecniche C64** su un vocabolario di ~100 termini (registri VIC-II/SID/CIA, istruzioni 6502, comandi BASIC, chip, concetti)
 - **>1KB** di dimensione
-- **Esclusi falsi `.asm`**: file in `data/src/` con doppia estensione (es. `.asm.pdf`) o >500KB (erano PDF/binari rinominati)
+- **Esclusi falsi `.asm`**: file in `data/raw/` con doppia estensione (es. `.asm.pdf`) o >500KB (erano PDF/binari rinominati)
 - Imposta `SKIP_PDF=1` nell'ambiente per escluderli
 
 Questo ha risolto allucinazioni come `$0314` invece di `$D020` — il filtro keyword garantisce che solo testi OCR di qualità sufficiente vengano indicizzati.
@@ -151,7 +151,7 @@ Teacher (modello grande)          Student (Qwen 1.5B)
 └─────────────────┘           └──────────────────┘
        │                                │
        ▼                                ▼
-data/output/distill_dataset.jsonl    data/models/c64-lora-pro/
+data/kb/distill_dataset.jsonl    data/models/c64-lora-pro/
 ```
 
 ### Teacher predefinito: OpenCode (gratuito)
@@ -182,7 +182,7 @@ Altri Teacher configurabili:
 
 ```bash
 # Addestrare Qwen con il dataset distillato
-python pipeline/train_lora.py data/output/distill_dataset.jsonl
+python pipeline/train_lora.py data/kb/distill_dataset.jsonl
 
 # Generare nuovo dataset con Teacher esterno
 python pipeline/knowledge_distiller.py --teacher groq --generate

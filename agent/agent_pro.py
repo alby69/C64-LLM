@@ -31,7 +31,7 @@ PREDEFINED = [
     ("project64", "Project 64"),
     ("nesdev", "NESdev 6502"),
 ]
-CUSTOM_SITES_FILE = "data/custom_sites.json"
+CUSTOM_SITES_FILE = "data/logs/custom_sites.json"
 
 
 class ProcessControl:
@@ -462,7 +462,7 @@ def download_and_integrate(url):
     is_gdrive = "drive.google.com" in url
 
     if is_gdrive:
-        dest_dir = "data/input"
+        dest_dir = "data/raw"
         os.makedirs(dest_dir, exist_ok=True)
         match = re.search(r"/drive/folders/([^/?]+)", url)
         if not match:
@@ -557,12 +557,12 @@ def download_and_integrate(url):
             )
 
     if is_pdf or is_d64 or is_prg or is_g64 or is_archive or is_gdrive:
-        dest = "data/input"
+        dest = "data/raw"
         os.makedirs(dest, exist_ok=True)
 
         if is_archive:
             yield log_msg("Analizzo contenuto Archive.org...")
-            from agent.crawler import WebCrawlerAgent
+            from pipeline.acquisition.crawler import WebCrawlerAgent
             import json as _json
 
             match = re.search(r"details/([^/?]+)", url)
@@ -626,15 +626,15 @@ def download_and_integrate(url):
                     ext = os.path.splitext(fname)[1].lower()
                     if ext == ".d64":
                         yield from run_cmd_gen(
-                            f'python pipeline/extract_d64.py "{local}" "{subdir}"'
+                            f'python pipeline/acquisition/extract_d64.py "{local}" "{subdir}"'
                         )
                     elif ext == ".g64":
                         yield from run_cmd_gen(
-                            f'python pipeline/extract_g64.py "{local}" "{subdir}"'
+                            f'python pipeline/acquisition/extract_g64.py "{local}" "{subdir}"'
                         )
                     elif ext == ".prg":
                         yield from run_cmd_gen(
-                            f'python pipeline/extract_prg.py "{local}" "{subdir}"'
+                            f'python pipeline/acquisition/extract_prg.py "{local}" "{subdir}"'
                         )
 
             if text_file:
@@ -658,7 +658,7 @@ def download_and_integrate(url):
                             f.write(chunk)
                     yield log_msg(f"  Salvato: {local}")
 
-                    raw_path = "data/output/raw.txt"
+                    raw_path = "data/logs/raw_extracted.txt"
                     if ext == ".txt":
                         import shutil
 
@@ -680,17 +680,17 @@ def download_and_integrate(url):
                     else:
                         yield log_msg("  Estrazione testo da PDF (marker)...")
                         yield from run_cmd_gen(
-                            f'python pipeline/pdf2marker.py "{local}" "{raw_path}"'
+                            f'python pipeline/acquisition/pdf2marker.py "{local}" "{raw_path}"'
                         )
 
                     if os.path.exists(raw_path):
                         yield log_msg("Pulizia testo...")
                         yield from run_cmd_gen(
-                            f'python pipeline/text_cleaner.py "{raw_path}" "data/output/clean.txt"'
+                            f'python pipeline/acquisition/text_cleaner.py "{raw_path}" "data/kb/clean.txt"'
                         )
                         yield log_msg("Generazione dataset...")
                         yield from run_cmd_gen(
-                            "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                            "python pipeline/acquisition/build_dataset.py data data/logs/dataset_unified.jsonl"
                         )
                     else:
                         yield log_msg("  Nessun testo estratto.")
@@ -710,7 +710,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"D64 scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_d64.py "{path}" "{dest}"')
+            yield from run_cmd_gen(f'python pipeline/acquisition/extract_d64.py "{path}" "{dest}"')
 
         elif is_g64:
             yield log_msg("Download G64...")
@@ -722,7 +722,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"G64 scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_g64.py "{path}" "{dest}"')
+            yield from run_cmd_gen(f'python pipeline/acquisition/extract_g64.py "{path}" "{dest}"')
 
         elif is_prg:
             yield log_msg("Download PRG...")
@@ -734,7 +734,7 @@ def download_and_integrate(url):
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
             yield log_msg(f"PRG scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_prg.py "{path}" "{dest}"')
+            yield from run_cmd_gen(f'python pipeline/acquisition/extract_prg.py "{path}" "{dest}"')
 
         elif is_gdrive:
             gdrive_dir = os.path.join(dest, "drive_" + folder_id)
@@ -749,12 +749,12 @@ def download_and_integrate(url):
             if pdfs:
                 combined = []
                 for i, pdf_path in enumerate(pdfs):
-                    tmp_base = f"data/output/raw_pdf{i}"
+                    tmp_base = f"data/logs/raw_pdf{i}"
                     yield log_msg(
                         f"  [{i + 1}/{len(pdfs)}] {os.path.basename(pdf_path)}"
                     )
                     yield from run_cmd_gen(
-                        f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
+                        f'python pipeline/acquisition/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                     )
                     tmp = tmp_base + ".txt"
                     if os.path.exists(tmp):
@@ -773,17 +773,17 @@ def download_and_integrate(url):
                             except:
                                 pass
                 if combined:
-                    with open("data/output/raw.txt", "w", encoding="utf-8") as f:
+                    with open("data/logs/raw.txt", "w", encoding="utf-8") as f:
                         f.write("\n\n".join(combined))
                     yield log_msg(
                         f"  Uniti {len(combined)}/{len(pdfs)} PDF con testo, pulizia..."
                     )
                     yield from run_cmd_gen(
-                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+                        "python pipeline/acquisition/text_cleaner.py data/logs/raw.txt data/kb/clean.txt"
                     )
                     yield log_msg("Generazione dataset...")
                     yield from run_cmd_gen(
-                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                        "python pipeline/acquisition/build_dataset.py data data/logs/dataset_unified.jsonl"
                     )
                 else:
                     yield log_msg("  Nessun PDF con testo estraibile.")
@@ -822,41 +822,41 @@ def download_and_integrate(url):
         yield log_msg("COMPLETATO")
     else:
         yield log_msg("Cerco PDF nel sito...")
-        yield from run_cmd_gen(f'python pipeline/scrape_docs.py "{url}"')
+        yield from run_cmd_gen(f'python pipeline/acquisition/scrape_docs.py "{url}"')
         if CTRL.cancelled:
             return
 
         yield log_msg("Cerco codice Assembly...")
-        yield from run_cmd_gen(f'python pipeline/scrape_url.py "{url}" "web"')
+        yield from run_cmd_gen(f'python pipeline/acquisition/scrape_url.py "{url}" "web"')
         if CTRL.cancelled:
             return
 
         yield log_msg("Estrazione PDF trovati...")
         pdfs = []
-        for root, _, files in os.walk("data/input"):
+        for root, _, files in os.walk("data/raw"):
             for fname in files:
                 if fname.lower().endswith(".pdf"):
                     pdfs.append(os.path.join(root, fname))
                 elif fname.lower().endswith(".d64"):
                     yield from run_cmd_gen(
-                        f'python pipeline/extract_d64.py "{os.path.join(root, fname)}" "{root}"'
+                        f'python pipeline/acquisition/extract_d64.py "{os.path.join(root, fname)}" "{root}"'
                     )
                 elif fname.lower().endswith(".g64"):
                     yield from run_cmd_gen(
-                        f'python pipeline/extract_g64.py "{os.path.join(root, fname)}" "{root}"'
+                        f'python pipeline/acquisition/extract_g64.py "{os.path.join(root, fname)}" "{root}"'
                     )
                 elif fname.lower().endswith(".prg"):
                     yield from run_cmd_gen(
-                        f'python pipeline/extract_prg.py "{os.path.join(root, fname)}" "{root}"'
+                        f'python pipeline/acquisition/extract_prg.py "{os.path.join(root, fname)}" "{root}"'
                     )
 
         if pdfs:
             combined = []
             for i, pdf_path in enumerate(pdfs):
-                tmp_base = f"data/output/raw_pdf{i}"
+                tmp_base = f"data/logs/raw_pdf{i}"
                 yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
                 yield from run_cmd_gen(
-                    f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
+                    f'python pipeline/acquisition/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                 )
                 tmp = tmp_base + ".txt"
                 if os.path.exists(tmp):
@@ -867,16 +867,16 @@ def download_and_integrate(url):
                             os.remove(tmp_base + _ext)
                         except:
                             pass
-            with open("data/output/raw.txt", "w") as f:
+            with open("data/logs/raw.txt", "w") as f:
                 f.write("\n\n".join(combined))
-            yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
+            yield log_msg(f"  Uniti {len(pdfs)} PDF in data/logs/raw.txt")
             yield log_msg("Pulizia testo...")
             yield from run_cmd_gen(
-                "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+                "python pipeline/acquisition/text_cleaner.py data/logs/raw.txt data/kb/clean.txt"
             )
             yield log_msg("Generazione dataset...")
             yield from run_cmd_gen(
-                "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                "python pipeline/acquisition/build_dataset.py data data/logs/dataset_unified.jsonl"
             )
         else:
             yield log_msg("Nessun PDF trovato.")
@@ -915,13 +915,13 @@ def on_rebuild():
 
 
 def on_process_local():
-    """Processa tutti i documenti in data/input e ricostruisce la KB."""
+    """Processa tutti i documenti in data/raw e ricostruisce la KB."""
     try:
-        from pipeline.process_batch import process_all_pdfs
+        from pipeline.processing.process_batch import process_all_pdfs
 
-        yield log_msg("Avvio elaborazione documenti locali in data/input...")
+        yield log_msg("Avvio elaborazione documenti locali in data/raw...")
 
-        process_all_pdfs(["data/input"], "data/output")
+        process_all_pdfs(["data/raw"], "data/kb")
         yield log_msg("Elaborazione PDF completata. Ricostruisco l'indice...")
 
         old_stdout = sys.stdout
@@ -943,9 +943,8 @@ def on_process_local():
 
 
 KB_DIRS = [
-    ("knowledge_base", "File Markdown (.md)"),
-    ("data/input", "File estratti (.bas.txt, .ml.txt)"),
-    ("data/src", "File scraper (.asm)"),
+    ("data/kb", "File Markdown e testo (.md, .txt)"),
+    ("data/raw", "File sorgenti (.bas, .ml, .asm)"),
 ]
 
 
@@ -1057,24 +1056,21 @@ def search_kb_files(query):
 def on_status():
     lines = []
     for path, label in [
-        ("knowledge_base", "File Markdown"),
-        ("data/input", "PDF in input"),
-        ("data/src", "File scraper"),
-        ("data/vectorstore", "Indice vettoriale"),
+        ("data/kb", "Knowledge Base (MD/TXT)"),
+        ("data/raw", "Sorgenti (PDF/D64/ASM)"),
+        ("data/db/faiss", "Indice vettoriale"),
     ]:
         if os.path.exists(path):
-            if path == "data/src":
-                n = sum(len(files) for _, _, files in os.walk(path))
-            elif path == "data/vectorstore":
+            if path == "data/db/faiss":
                 n = len(os.listdir(path))
             else:
-                n = len([f for f in os.listdir(path) if not f.startswith(".")])
+                n = sum(len(files) for _, _, files in os.walk(path) if not any(d.startswith('.') for d in _.split(os.sep)))
             lines.append(f"{label}: {n}")
         else:
             lines.append(f"{label}: assente")
     custom = load_custom_sites()
     lines.append(f"Siti personalizzati: {len(custom)}")
-    ds_path = "data/output/dataset_unified.jsonl"
+    ds_path = "data/logs/dataset_unified.jsonl"
     if os.path.exists(ds_path):
         with open(ds_path) as f:
             n = sum(1 for _ in f)
@@ -1132,7 +1128,7 @@ def on_view_dataset(page=0, query=""):
         page = 0
     if query is None:
         query = ""
-    path = "data/output/dataset_unified.jsonl"
+    path = "data/logs/dataset_unified.jsonl"
     if not os.path.exists(path):
         return (
             "<div style='color:#ff6;padding:20px;text-align:center'>Dataset non trovato. Esegui prima la pipeline.</div>",
@@ -1374,7 +1370,7 @@ def on_distill_generate(
     }
     save_distill_config(cfg)
 
-    cmd = f"python pipeline/knowledge_distiller.py --generate"
+    cmd = f"python pipeline/acquisition/knowledge_distiller.py --generate"
     if backend != "opencode":
         cmd += f" --teacher {backend}"
         if model_name:
@@ -1390,7 +1386,7 @@ def on_distill_generate(
 
     if not CTRL.cancelled:
         yield log_msg(
-            "✅ Dataset distillato generato in data/output/distill_dataset.jsonl"
+            "✅ Dataset distillato generato in data/logs/distill_dataset.jsonl"
         )
 
     CTRL.running = False
@@ -1403,7 +1399,7 @@ def on_distill_train(dataset_path, output_dir, max_seq_length):
     log_path = os.path.join(output_dir, "training_log.txt")
     yield log_msg(f"Avvio training LoRA...")
     yield log_msg(f"Log completo salvato in: {log_path}")
-    cmd = f"python pipeline/train_lora.py {dataset_path}"
+    cmd = f"python pipeline/acquisition/train_lora.py {dataset_path}"
     env = {"OUTPUT_DIR": output_dir, "MAX_SEQ_LENGTH": str(max_seq_length)}
     all_lines = []
     for msg in run_cmd_gen(cmd, env=env):
@@ -1426,7 +1422,7 @@ def on_distill_train(dataset_path, output_dir, max_seq_length):
 
 def on_distill_status():
     lines = []
-    ds_path = "data/output/distill_dataset.jsonl"
+    ds_path = "data/logs/distill_dataset.jsonl"
     if os.path.exists(ds_path):
         with open(ds_path) as f:
             n = sum(1 for _ in f)
@@ -1453,10 +1449,10 @@ def on_distill_status():
 
 def on_distill_placeholder():
     yield log_msg("Generazione placeholder...")
-    from pipeline.knowledge_distiller import KnowledgeDistiller
+    from pipeline.distillation.knowledge_distiller import KnowledgeDistiller
 
     d = KnowledgeDistiller()
-    d.save_placeholder("data/output/distill_dataset.jsonl")
+    d.save_placeholder("data/logs/distill_dataset.jsonl")
     yield log_msg("✅ Placeholder salvato")
 
 
@@ -1518,8 +1514,8 @@ def get_lora_status():
     return "ℹ️ Modello base"
 
 
-PROMPT_DATASET_PATH = "data/prompt_dataset.json"
-WIKI_GRAPH_PATH = "data/wiki_graph.json"
+PROMPT_DATASET_PATH = "data/logs/prompt_dataset.json"
+WIKI_GRAPH_PATH = "data/kb/wiki_graph.json"
 
 
 def load_prompt_dataset():
@@ -2141,13 +2137,12 @@ if(pan) {{
 def bootstrap():
     """Crea le cartelle necessarie se non esistono."""
     dirs = [
-        "data/input",
-        "data/output",
-        "data/tmp",
+        "data/raw",
+        "data/kb",
+        "data/kb/manuali",
         "data/models",
-        "data/src",
-        "data/vectorstore",
-        "knowledge_base",
+        "data/db/faiss",
+        "data/logs",
     ]
     for d in dirs:
         os.makedirs(d, exist_ok=True)
@@ -2266,7 +2261,7 @@ def launch_ui():
                     break
                 yield log_msg(f"Scraping: {s}")
                 yield from run_cmd_gen(
-                    f"python pipeline/c64_asm_scraper.py --sites {s} --delay 1.5"
+                    f"python pipeline/acquisition/c64_asm_scraper.py --sites {s} --delay 1.5"
                 )
 
             for s in custom_sel:
@@ -2275,29 +2270,29 @@ def launch_ui():
                     break
                 yield log_msg(f"Scraping: {s['name']}")
                 yield log_msg("  Cerco PDF...")
-                yield from run_cmd_gen(f'python pipeline/scrape_docs.py "{s["url"]}"')
+                yield from run_cmd_gen(f'python pipeline/acquisition/scrape_docs.py "{s["url"]}"')
                 if CTRL.cancelled:
                     yield log_msg("ANNULLATO")
                     break
                 yield log_msg("  Cerco codice Assembly...")
                 yield from run_cmd_gen(
-                    f'python pipeline/scrape_url.py "{s["url"]}" "{s["name"]}"'
+                    f'python pipeline/acquisition/scrape_url.py "{s["url"]}" "{s["name"]}"'
                 )
 
             if not CTRL.cancelled:
                 yield log_msg("Estrazione testo da PDF...")
                 pdfs = []
-                for root, _, files in os.walk("data/input"):
+                for root, _, files in os.walk("data/raw"):
                     for fname in files:
                         if fname.lower().endswith(".pdf"):
                             pdfs.append(os.path.join(root, fname))
                 if pdfs:
                     combined = []
                     for i, pdf_path in enumerate(pdfs):
-                        tmp_base = f"data/output/raw_pdf{i}"
+                        tmp_base = f"data/logs/raw_pdf{i}"
                         yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
                         yield from run_cmd_gen(
-                            f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
+                            f'python pipeline/acquisition/pdf2marker.py "{pdf_path}" "{tmp_base}"'
                         )
                         tmp = tmp_base + ".txt"
                         if os.path.exists(tmp):
@@ -2308,16 +2303,16 @@ def launch_ui():
                                     os.remove(tmp_base + _ext)
                                 except:
                                     pass
-                    with open("data/output/raw.txt", "w") as f:
+                    with open("data/logs/raw.txt", "w") as f:
                         f.write("\n\n".join(combined))
-                    yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
+                    yield log_msg(f"  Uniti {len(pdfs)} PDF in data/logs/raw.txt")
                     yield log_msg("Pulizia testo...")
                     yield from run_cmd_gen(
-                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
+                        "python pipeline/acquisition/text_cleaner.py data/logs/raw.txt data/kb/clean.txt"
                     )
                     yield log_msg("Generazione dataset...")
                     yield from run_cmd_gen(
-                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+                        "python pipeline/acquisition/build_dataset.py data data/logs/dataset_unified.jsonl"
                     )
                 else:
                     yield log_msg("Nessun PDF da processare.")
@@ -2456,7 +2451,7 @@ def launch_ui():
             with gr.Row():
                 with gr.Column(scale=1):
                     process_local_btn = gr.Button(
-                        "📂 Processa Documenti Locali (data/input)", variant="primary"
+                        "📂 Processa Documenti Locali (data/raw)", variant="primary"
                     )
                     rebuild_btn = gr.Button(
                         "Ricostruisci solo Indice", variant="secondary"
@@ -2639,7 +2634,7 @@ def launch_ui():
                     gr.Markdown("### Training LoRA")
                     train_dataset = gr.Textbox(
                         label="Dataset path",
-                        value="data/output/distill_dataset.jsonl",
+                        value="data/logs/distill_dataset.jsonl",
                     )
                     train_output = gr.Textbox(
                         label="Output dir",

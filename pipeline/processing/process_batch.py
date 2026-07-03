@@ -25,14 +25,14 @@ def process_all_pdfs(base_dirs, output_dir):
 
         try:
             result = subprocess.run(
-                ["python3", "pipeline/pdf2marker.py", pdf_path, output_base],
+                ["python3", "pipeline/processing/pdf2marker.py", pdf_path, output_base],
                 capture_output=True, text=True,
             )
 
             if result.returncode != 0:
                 logger.warning(f"  pdf2marker fallito per {basename}, tento pdf2text fallback...")
                 fallback_result = subprocess.run(
-                    ["python3", "pipeline/pdf2text.py", pdf_path, output_base + ".txt"],
+                    ["python3", "pipeline/processing/pdf2text.py", pdf_path, output_base + ".txt"],
                     capture_output=True, text=True,
                 )
                 if fallback_result.returncode != 0:
@@ -43,7 +43,7 @@ def process_all_pdfs(base_dirs, output_dir):
             clean_path = output_base + "_clean.txt"
             if os.path.exists(txt_path):
                 subprocess.run(
-                    ["python3", "pipeline/text_cleaner.py", txt_path, clean_path],
+                    ["python3", "pipeline/processing/text_cleaner.py", txt_path, clean_path],
                     check=True, capture_output=True, text=True,
                 )
 
@@ -52,4 +52,4 @@ def process_all_pdfs(base_dirs, output_dir):
             logger.error(f"  ERROR: {basename} - {e}")
 
 if __name__ == "__main__":
-    process_all_pdfs(["data/input", "data/tmp"], "data/output")
+    process_all_pdfs(["data/raw"], "data/kb")

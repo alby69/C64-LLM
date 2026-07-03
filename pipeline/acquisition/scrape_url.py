@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from pipeline.c64_asm_scraper import Downloader, Scraper
+from pipeline.acquisition.c64_asm_scraper import Downloader, Scraper
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -20,7 +20,7 @@ if __name__ == "__main__":
         "extract_code_blocks": True,
     }
 
-    downloader = Downloader(Path("data/src"))
+    downloader = Downloader(Path("data/raw"))
     scraper = Scraper(downloader, delay=1.5)
     scraper.run_site(site)
     print(f"\nScraping completato. File salvati: {downloader.total_saved}")

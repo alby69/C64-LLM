@@ -540,8 +540,8 @@ def parse_args():
     )
     p.add_argument(
         "--output", "-o",
-        default="./data/src",
-        help="Cartella di output (default: ./data/src)",
+        default="./data/raw",
+        help="Cartella di output (default: ./data/raw)",
     )
     p.add_argument(
         "--delay", "-d",
@@ -600,7 +600,7 @@ def main():
     log.info(f"{'='*60}")
 
     # Riepilogo per sito
-    print("\nRiepilogo per sito (data/src/):")
+    print("\nRiepilogo per sito (data/raw/):")
     for d in sorted(base_dir.iterdir()):
         if d.is_dir():
             n = len(list(d.glob("*")))
@@ -608,7 +608,7 @@ def main():
 
     input_dir = base_dir.parent / "input"
     if input_dir.exists():
-        print("\nRiepilogo per sito (data/input/):")
+        print("\nRiepilogo per sito (data/raw/):")
         for d in sorted(input_dir.iterdir()):
             if d.is_dir():
                 n = len(list(d.glob("*")))
