@@ -1,8 +1,12 @@
 import os
-import subprocess
 import glob
 import logging
 from pathlib import Path
+
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("batch_processor")
@@ -14,42 +18,47 @@ def process_all_pdfs(base_dirs, output_dir):
     for d in base_dirs:
         pdf_files.extend(glob.glob(f"{d}/**/*.pdf", recursive=True))
 
-    logger.info(f"Found {len(pdf_files)} PDF files to process.")
+    logger.info(f"Trovati {len(pdf_files)} file PDF da elaborare.")
 
     for pdf_path in pdf_files:
         basename = os.path.basename(pdf_path)
         name_no_ext = os.path.splitext(basename)[0]
-        output_base = os.path.join(output_dir, name_no_ext)
+        output_txt = os.path.join(output_dir, name_no_ext + ".txt")
+        output_clean = os.path.join(output_dir, name_no_ext + "_clean.txt")
 
-        logger.info(f"Processing {basename}...")
+        logger.info(f"Elaborazione in corso: {basename}...")
+
+        if not fitz:
+            logger.error("PyMuPDF (fitz) non installato. Impossibile estrarre testo dal PDF.")
+            continue
 
         try:
-            result = subprocess.run(
-                ["python3", "pipeline/pdf2marker.py", pdf_path, output_base],
-                capture_output=True, text=True,
-            )
+            doc = fitz.open(pdf_path)
+            text = ""
+            for page in doc:
+                text += page.get_text()
 
-            if result.returncode != 0:
-                logger.warning(f"  pdf2marker fallito per {basename}, tento pdf2text fallback...")
-                fallback_result = subprocess.run(
-                    ["python3", "pipeline/pdf2text.py", pdf_path, output_base + ".txt"],
-                    capture_output=True, text=True,
-                )
-                if fallback_result.returncode != 0:
-                    logger.error(f"  FALLBACK FALLITO: {basename} - {fallback_result.stderr.strip()}")
-                    continue
+            # Salva testo grezzo
+            with open(output_txt, "w", encoding="utf-8") as f:
+                f.write(text)
 
-            txt_path = output_base + ".txt"
-            clean_path = output_base + "_clean.txt"
-            if os.path.exists(txt_path):
-                subprocess.run(
-                    ["python3", "pipeline/text_cleaner.py", txt_path, clean_path],
-                    check=True, capture_output=True, text=True,
-                )
+            # Semplice pulizia del testo (visto che text_cleaner.py e' rimosso/delegato)
+            # Rimuove righe vuote duplicate e spazi consecutivi insoliti
+            lines = [line.strip() for line in text.split("\n")]
+            cleaned_lines = []
+            for line in lines:
+                if line:
+                    cleaned_lines.append(line)
+                elif cleaned_lines and cleaned_lines[-1] != "":
+                    cleaned_lines.append("")
+
+            clean_text = "\n".join(cleaned_lines)
+            with open(output_clean, "w", encoding="utf-8") as f:
+                f.write(clean_text)
 
             logger.info(f"  OK: {basename}")
         except Exception as e:
-            logger.error(f"  ERROR: {basename} - {e}")
+            logger.error(f"  ERRORE: {basename} - {e}")
 
 if __name__ == "__main__":
     process_all_pdfs(["data/input", "data/tmp"], "data/output")

@@ -14,14 +14,9 @@ REPORT_FILE = os.path.join(LOG_DIR, "pipeline_report.txt")
 
 STEPS = [
     {
-        "name": "Estrazione PDF (marker)",
-        "cmd": f"python pipeline/pdf2marker.py {INPUT_PDF} {RAW_TEXT}",
-        "log": os.path.join(LOG_DIR, "01_pdf_extraction.log"),
-    },
-    {
-        "name": "Pulizia Testo (PRO)",
-        "cmd": f"python pipeline/text_cleaner.py {RAW_TEXT} {CLEAN_TEXT}",
-        "log": os.path.join(LOG_DIR, "02_text_cleaning.log"),
+        "name": "Estrazione e Pulizia PDF (built-in Pure Python)",
+        "cmd": f"python pipeline/process_batch.py",
+        "log": os.path.join(LOG_DIR, "01_pdf_process.log"),
     },
     {
         "name": "Generazione Dataset Unificato",
@@ -53,12 +48,11 @@ def run_step(step):
 
     with open(step["log"], "w") as log_file:
         try:
-            # Check if input file exists for PDF extraction
-            if "pdf2marker.py" in step["cmd"] or "pdf2text.py" in step["cmd"]:
-                pdf_path = step["cmd"].split()[2]
-                if not os.path.exists(pdf_path):
-                    print(f"[WARN] PDF non trovato: {pdf_path}. Salto questo step.")
-                    return True, f"{step['name']} saltato (file mancante)."
+            # For process_batch or others, we can check if data/input directory has PDFs or if INPUT_PDF exists
+            if "process_batch.py" in step["cmd"]:
+                if not os.path.exists("data/input") or not any(f.endswith(".pdf") for f in os.listdir("data/input")):
+                    print(f"[WARN] Nessun PDF trovato in data/input. Salto questo step.")
+                    return True, f"{step['name']} saltato (nessun PDF trovato)."
 
             result = subprocess.run(
                 step["cmd"],
