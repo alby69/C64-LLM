@@ -1,3 +1,14 @@
+model:
+  backend: "nanoGPT"     # nanoGPT | gguf | hf | api
+  nanoGPT:
+    model_path: "data/models/c64-micron.pt"
+    tokenizer: "gpt2"
+  gguf:
+    path: "data/models/qwen.Q4_K_M.gguf"
+  api:
+    provider: "openai"
+    key: "${OPENAI_API_KEY}"
+
 agent:
   max_attempts: 3
   model_name: "Qwen/Qwen2.5-Coder-1.5B-Instruct"

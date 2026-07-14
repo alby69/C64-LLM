@@ -569,46 +569,10 @@ def download_and_integrate(url):
                             pdfs.append(os.path.join(root, fname))
             yield log_msg(f"  Trovati {len(pdfs)} PDF.")
             if pdfs:
-                combined = []
-                for i, pdf_path in enumerate(pdfs):
-                    tmp_base = f"data/output/raw_pdf{i}"
-                    yield log_msg(
-                        f"  [{i + 1}/{len(pdfs)}] {os.path.basename(pdf_path)}"
-                    )
-                    yield from run_cmd_gen(
-                        f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
-                    )
-                    tmp = tmp_base + ".txt"
-                    if os.path.exists(tmp):
-                        try:
-                            with open(tmp, encoding="utf-8", errors="replace") as f:
-                                content = f.read()
-                            if content.strip():
-                                combined.append(content)
-                            else:
-                                yield log_msg(f"    (estrazione vuota)")
-                        except Exception as e:
-                            yield log_msg(f"    (errore lettura: {e})")
-                        for _ext in [".txt", ".md", ".meta.json"]:
-                            try:
-                                os.remove(tmp_base + _ext)
-                            except:
-                                pass
-                if combined:
-                    with open("data/output/raw.txt", "w", encoding="utf-8") as f:
-                        f.write("\n\n".join(combined))
-                    yield log_msg(
-                        f"  Uniti {len(combined)}/{len(pdfs)} PDF con testo, pulizia..."
-                    )
-                    yield from run_cmd_gen(
-                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
-                    )
-                    yield log_msg("Generazione dataset...")
-                    yield from run_cmd_gen(
-                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
-                    )
-                else:
-                    yield log_msg("  Nessun PDF con testo estraibile.")
+                yield log_msg("Estrazione e pulizia dei PDF scaricati...")
+                yield from run_cmd_gen("python pipeline/process_batch.py")
+                yield log_msg("Generazione dataset...")
+                yield from run_cmd_gen("python pipeline/build_dataset.py data data/output/dataset_unified.jsonl")
             else:
                 yield log_msg("Nessun PDF trovato tra i file scaricati.")
 
@@ -642,7 +606,7 @@ def download_and_integrate(url):
             for chunk in r.iter_content(8192):
                 f.write(chunk)
         yield log_msg(f"D64 scaricato: {path}")
-        yield from run_cmd_gen(f'python pipeline/extract_d64.py "{path}" "{dest}"')
+        yield log_msg("L'estrazione e la decodifica di file D64 sono ora delegate a PYC64.")
 
     elif is_g64:
         yield log_msg("Download G64...")
@@ -654,7 +618,7 @@ def download_and_integrate(url):
             for chunk in r.iter_content(8192):
                 f.write(chunk)
         yield log_msg(f"G64 scaricato: {path}")
-        yield from run_cmd_gen(f'python pipeline/extract_g64.py "{path}" "{dest}"')
+        yield log_msg("L'estrazione e la decodifica di file G64 sono ora delegate a PYC64.")
 
     elif is_prg:
         yield log_msg("Download PRG...")
@@ -666,7 +630,7 @@ def download_and_integrate(url):
             for chunk in r.iter_content(8192):
                 f.write(chunk)
         yield log_msg(f"PRG scaricato: {path}")
-        yield from run_cmd_gen(f'python pipeline/extract_prg.py "{path}" "{dest}"')
+        yield log_msg("L'estrazione e la decodifica di file PRG sono ora delegate a PYC64.")
 
     else:
         yield log_msg("Il crawling e lo scraping dei siti web sono delegati a C64-Scrapy e C64-KB-Agent.")
