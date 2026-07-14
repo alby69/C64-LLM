@@ -42,9 +42,9 @@ class C64KnowledgeBase:
         print(f"  [{_time.time()-_t0:.1f}s] KB markdown...", flush=True)
         kb_walk_paths = []
         if self.kb_path:
-            kb_walk_paths.append(os.path.abspath(self.kb_path))
+            kb_walk_paths.append(os.path.realpath(self.kb_path))
         if os.path.exists("data/kb"):
-            abs_kb = os.path.abspath("data/kb")
+            abs_kb = os.path.realpath("data/kb")
             if abs_kb not in kb_walk_paths:
                 kb_walk_paths.append(abs_kb)
 

@@ -249,7 +249,7 @@ Il `ScrapyKBAdapter` in `pipeline/acquisition/` è già il ponte. A regime, C64-
 |------|------|-------|
 | 0 | Snellimento documentazione (18 file -> 3) | **FATTO** |
 | 1 | Rimuovere script duplicati, delegare a repo fratelli | DA FARE |
-| 2 | `C64-Intelligence-SDK` con submodule + integrazione CI | DA FARE |
+| 2 | `C64-Intelligence-SDK` con submodule + integrazione CI | **FATTO** (Submodulo `C64-KB-Agent` collegato e integrato) |
 | 3 | **nanoGPT prepper** (corpus + BPE tokenizer) | **FATTO** (`nanogpt_prepper.py`) |
 | 3 | **dataset generato** (38.6M token C64) | **FATTO** (`data/nanogpt_c64/`) |
 | 3 | **BPE GPT-2 come default** | **FATTO** |

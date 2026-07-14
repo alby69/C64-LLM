@@ -31,8 +31,14 @@ class NanoGPTPrepper:
         logger.info("Gathering text corpus from C64 Knowledge Base sources...")
         corpus_parts = []
 
-        # 1. Scan markdown files in knowledge_base/ and data/kb/
-        kb_paths = [Path("knowledge_base"), Path("data/kb"), Path("docs")]
+        # 1. Scan markdown files in knowledge_base/, data/kb/, and C64-KB-Agent submodule
+        kb_paths = [
+            Path("knowledge_base"),
+            Path("data/kb"),
+            Path("docs"),
+            Path("C64-KB-Agent/data/docs"),
+            Path("C64-KB-Agent/knowledge_base")
+        ]
         for kb_path in kb_paths:
             if kb_path.exists():
                 logger.info(f"Scanning markdown files in: {kb_path}")
