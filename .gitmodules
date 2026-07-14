@@ -1,3 +1,6 @@
 [submodule "external/py6502"]
 	path = external/py6502
 	url = https://github.com/mnaberez/py65.git
+[submodule "C64-KB-Agent"]
+	path = C64-KB-Agent
+	url = https://github.com/alby69/C64-KB-Agent.git

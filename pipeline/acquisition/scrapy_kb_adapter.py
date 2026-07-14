@@ -16,7 +16,12 @@ class ScrapyKBAdapter:
     Ensures seamless ingestion of scraped web pages, tutorials, and books.
     """
 
-    def __init__(self, kb_agent_path="../C64-KB-Agent", scrapy_path="../C64-Scrapy", dest_kb_path="data/kb/scraped"):
+    def __init__(self, kb_agent_path=None, scrapy_path="../C64-Scrapy", dest_kb_path="data/kb/scraped"):
+        if kb_agent_path is None:
+            if Path("C64-KB-Agent").exists():
+                kb_agent_path = "C64-KB-Agent"
+            else:
+                kb_agent_path = "../C64-KB-Agent"
         self.kb_agent_path = Path(kb_agent_path)
         self.scrapy_path = Path(scrapy_path)
         self.dest_kb_path = Path(dest_kb_path)
@@ -65,6 +70,7 @@ class ScrapyKBAdapter:
 
         # Search for markdown files in C64-KB-Agent's scraped directory (e.g., 'scraped' or 'data/scraped')
         search_dirs = [
+            self.kb_agent_path / "data/docs",
             self.kb_agent_path / "data/scraped",
             self.kb_agent_path / "scraped",
             self.kb_agent_path
