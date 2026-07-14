@@ -461,21 +461,23 @@ def download_and_integrate(url):
     is_archive = "archive.org" in url
     is_gdrive = "drive.google.com" in url
 
+    dest = "data/input"
+    os.makedirs(dest, exist_ok=True)
+
     if is_gdrive:
-        dest_dir = "data/input"
-        os.makedirs(dest_dir, exist_ok=True)
+        yield log_msg("━━━ Google Drive ━━━")
+        yield log_msg("  ID cartella Google Drive rilevato.")
+        yield log_msg("  Installazione gdown...")
+        yield from run_cmd_gen("pip install -q gdown")
+
         match = re.search(r"/drive/folders/([^/?]+)", url)
         if not match:
             yield log_msg("URL Google Drive non valido.")
+            CTRL.running = False
             return
         folder_id = match.group(1)
-        out_dir = os.path.join(dest_dir, "drive_" + folder_id)
+        out_dir = os.path.join(dest, "drive_" + folder_id)
         os.makedirs(out_dir, exist_ok=True)
-        yield log_msg("━━━ Google Drive ━━━")
-        yield log_msg(f"  ID cartella: {folder_id}")
-        yield log_msg(f"  Destinazione: {out_dir}")
-        yield log_msg("  Installazione gdown...")
-        yield from run_cmd_gen("pip install -q gdown")
 
         yield log_msg("  Enumerazione file nella cartella...")
         import gdown as _gd
@@ -556,188 +558,8 @@ def download_and_integrate(url):
                 f"  ══ Riepilogo: {ok} scaricati, {skip} già presenti, {err} errori ══"
             )
 
-    if is_pdf or is_d64 or is_prg or is_g64 or is_archive or is_gdrive:
-        dest = "data/input"
-        os.makedirs(dest, exist_ok=True)
-
-        if is_archive:
-            yield log_msg("Analizzo contenuto Archive.org...")
-            from agent.crawler import WebCrawlerAgent
-            import json as _json
-
-            match = re.search(r"details/([^/?]+)", url)
-            if not match:
-                yield log_msg("URL Archive.org non valido.")
-                return
-            item_id = match.group(1)
-
-            resp = req.get(f"https://archive.org/metadata/{item_id}", timeout=15)
-            resp.raise_for_status()
-            meta = resp.json()
-            files = meta.get("files", [])
-
-            d64_files = [f for f in files if f["name"].lower().endswith(".d64")]
-            g64_files = [f for f in files if f["name"].lower().endswith(".g64")]
-            prg_files = [f for f in files if f["name"].lower().endswith(".prg")]
-
-            disk_files = d64_files + g64_files + prg_files
-
-            FORMAT_PRIORITY = [
-                (".txt", "txt"),
-                (".epub", "epub"),
-                (".html", "html"),
-                (".htm", "html"),
-                (".pdf", "pdf"),
-            ]
-
-            def pick_best(files_list):
-                best = None
-                best_idx = len(FORMAT_PRIORITY)
-                for f in files_list:
-                    ext = os.path.splitext(f["name"].lower())[1]
-                    for idx, (fmtext, _) in enumerate(FORMAT_PRIORITY):
-                        if ext == fmtext:
-                            if idx < best_idx:
-                                best = f
-                                best_idx = idx
-                            break
-                return best
-
-            text_file = pick_best(files)
-
-            if disk_files:
-                yield log_msg(f"Trovati {len(disk_files)} file disco/PRG. Download...")
-                subdir = os.path.join(dest, item_id)
-                os.makedirs(subdir, exist_ok=True)
-                for df in disk_files:
-                    fname = df["name"]
-                    dl_url = f"https://archive.org/download/{item_id}/{fname}"
-                    yield log_msg(f"  Download: {fname}")
-                    try:
-                        r = req.get(dl_url, stream=True, timeout=60, verify=False)
-                        r.raise_for_status()
-                    except Exception as e:
-                        yield log_msg(f"  ERRORE download {fname}: {e}")
-                        continue
-                    local = os.path.join(subdir, os.path.basename(fname))
-                    with open(local, "wb") as f:
-                        for chunk in r.iter_content(8192):
-                            f.write(chunk)
-                    ext = os.path.splitext(fname)[1].lower()
-                    if ext == ".d64":
-                        yield from run_cmd_gen(
-                            f'python pipeline/extract_d64.py "{local}" "{subdir}"'
-                        )
-                    elif ext == ".g64":
-                        yield from run_cmd_gen(
-                            f'python pipeline/extract_g64.py "{local}" "{subdir}"'
-                        )
-                    elif ext == ".prg":
-                        yield from run_cmd_gen(
-                            f'python pipeline/extract_prg.py "{local}" "{subdir}"'
-                        )
-
-            if text_file:
-                fname = text_file["name"]
-                ext = os.path.splitext(fname.lower())[1]
-                dl_url = f"https://archive.org/download/{item_id}/{fname}"
-                label = f"File {ext.upper()} (formato migliore disponibile)"
-                yield log_msg(f"Trovato {label}: {fname}")
-                yield log_msg(f"  Download: {fname}")
-                try:
-                    r = req.get(dl_url, stream=True, timeout=60, verify=False)
-                    r.raise_for_status()
-                except Exception as e:
-                    yield log_msg(f"  ERRORE download {fname}: {e}")
-                else:
-                    subdir = os.path.join(dest, item_id) if not disk_files else subdir
-                    os.makedirs(subdir, exist_ok=True)
-                    local = os.path.join(subdir, os.path.basename(fname))
-                    with open(local, "wb") as f:
-                        for chunk in r.iter_content(8192):
-                            f.write(chunk)
-                    yield log_msg(f"  Salvato: {local}")
-
-                    raw_path = "data/output/raw.txt"
-                    if ext == ".txt":
-                        import shutil
-
-                        shutil.copy2(local, raw_path)
-                        yield log_msg("  Testo già pronto, salto estrazione PDF.")
-                    elif ext == ".epub":
-                        yield log_msg("  Estrazione testo da EPUB...")
-                        try:
-                            _extract_epub_text(local, raw_path)
-                        except Exception as e:
-                            yield log_msg(f"  ERRORE estrazione EPUB: {e}")
-                            yield log_msg("  Uso pandoc come fallback...")
-                            yield from run_cmd_gen(
-                                f'pandoc "{local}" -t plain -o "{raw_path}"'
-                            )
-                    elif ext in (".html", ".htm"):
-                        yield log_msg("  Estrazione testo da HTML...")
-                        _extract_html_text(local, raw_path)
-                    else:
-                        yield log_msg("  Estrazione testo da PDF (marker)...")
-                        yield from run_cmd_gen(
-                            f'python pipeline/pdf2marker.py "{local}" "{raw_path}"'
-                        )
-
-                    if os.path.exists(raw_path):
-                        yield log_msg("Pulizia testo...")
-                        yield from run_cmd_gen(
-                            f'python pipeline/text_cleaner.py "{raw_path}" "data/output/clean.txt"'
-                        )
-                        yield log_msg("Generazione dataset...")
-                        yield from run_cmd_gen(
-                            "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
-                        )
-                    else:
-                        yield log_msg("  Nessun testo estratto.")
-            else:
-                yield log_msg("Nessun file testo/PDF trovato in questo item.")
-                if not disk_files:
-                    CTRL.running = False
-                    return
-
-        elif is_d64:
-            yield log_msg("Download D64...")
-            r = req.get(url, stream=True, timeout=60, verify=False)
-            r.raise_for_status()
-            fname = url.split("/")[-1] or "game.d64"
-            path = os.path.join(dest, fname)
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(8192):
-                    f.write(chunk)
-            yield log_msg(f"D64 scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_d64.py "{path}" "{dest}"')
-
-        elif is_g64:
-            yield log_msg("Download G64...")
-            r = req.get(url, stream=True, timeout=60, verify=False)
-            r.raise_for_status()
-            fname = url.split("/")[-1] or "disk.g64"
-            path = os.path.join(dest, fname)
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(8192):
-                    f.write(chunk)
-            yield log_msg(f"G64 scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_g64.py "{path}" "{dest}"')
-
-        elif is_prg:
-            yield log_msg("Download PRG...")
-            r = req.get(url, stream=True, timeout=60, verify=False)
-            r.raise_for_status()
-            fname = url.split("/")[-1] or "program.prg"
-            path = os.path.join(dest, fname)
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(8192):
-                    f.write(chunk)
-            yield log_msg(f"PRG scaricato: {path}")
-            yield from run_cmd_gen(f'python pipeline/extract_prg.py "{path}" "{dest}"')
-
-        elif is_gdrive:
-            gdrive_dir = os.path.join(dest, "drive_" + folder_id)
+            # process drive PDFs
+            gdrive_dir = out_dir
             yield log_msg(f"Cerco PDF in {gdrive_dir}...")
             pdfs = []
             if os.path.exists(gdrive_dir):
@@ -790,113 +612,84 @@ def download_and_integrate(url):
             else:
                 yield log_msg("Nessun PDF trovato tra i file scaricati.")
 
-        else:
-            yield log_msg("Download PDF...")
-            r = req.get(url, stream=True, timeout=30, verify=False)
-            r.raise_for_status()
-            fname = url.split("/")[-1] or "manual.pdf"
-            path = os.path.join(dest, fname)
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(8192):
-                    f.write(chunk)
-            yield log_msg(f"PDF scaricato: {path}")
+    elif is_archive:
+        yield log_msg("La scansione e il download da Archive.org sono delegati a C64-Scrapy.")
+        yield log_msg("Usa la scheda 'Integrazione C64-KB-Agent' per avviare lo spider corrispondente.")
+        CTRL.running = False
+        return
 
-            yield log_msg("Pipeline estrazione testo...")
-            yield from run_cmd_gen("python run_pipeline.py")
+    elif is_pdf:
+        yield log_msg("Download PDF...")
+        r = req.get(url, stream=True, timeout=30, verify=False)
+        r.raise_for_status()
+        fname = url.split("/")[-1] or "manual.pdf"
+        path = os.path.join(dest, fname)
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        yield log_msg(f"PDF scaricato: {path}")
 
-        yield log_msg("Ricostruzione KB...")
-        if not CTRL.cancelled:
-            try:
-                kb = C64KnowledgeBase()
-                old_stdout = sys.stdout
-                sys.stdout = StringIO()
-                kb.build_index()
-                out = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-                yield out
-            except Exception as e:
-                yield log_msg(f"ERRORE KB: {e}")
-                CTRL.running = False
-                return
+        yield log_msg("Pipeline estrazione testo...")
+        yield from run_cmd_gen("python run_pipeline.py")
 
-        yield log_msg("COMPLETATO")
+    elif is_d64:
+        yield log_msg("Download D64...")
+        r = req.get(url, stream=True, timeout=60, verify=False)
+        r.raise_for_status()
+        fname = url.split("/")[-1] or "game.d64"
+        path = os.path.join(dest, fname)
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        yield log_msg(f"D64 scaricato: {path}")
+        yield from run_cmd_gen(f'python pipeline/extract_d64.py "{path}" "{dest}"')
+
+    elif is_g64:
+        yield log_msg("Download G64...")
+        r = req.get(url, stream=True, timeout=60, verify=False)
+        r.raise_for_status()
+        fname = url.split("/")[-1] or "disk.g64"
+        path = os.path.join(dest, fname)
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        yield log_msg(f"G64 scaricato: {path}")
+        yield from run_cmd_gen(f'python pipeline/extract_g64.py "{path}" "{dest}"')
+
+    elif is_prg:
+        yield log_msg("Download PRG...")
+        r = req.get(url, stream=True, timeout=60, verify=False)
+        r.raise_for_status()
+        fname = url.split("/")[-1] or "program.prg"
+        path = os.path.join(dest, fname)
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        yield log_msg(f"PRG scaricato: {path}")
+        yield from run_cmd_gen(f'python pipeline/extract_prg.py "{path}" "{dest}"')
+
     else:
-        yield log_msg("Cerco PDF nel sito...")
-        yield from run_cmd_gen(f'python pipeline/scrape_docs.py "{url}"')
-        if CTRL.cancelled:
+        yield log_msg("Il crawling e lo scraping dei siti web sono delegati a C64-Scrapy e C64-KB-Agent.")
+        yield log_msg("Usa la scheda 'Integrazione C64-KB-Agent' per avviare gli spider e sincronizzare i risultati.")
+        CTRL.running = False
+        return
+
+    yield log_msg("Ricostruzione KB...")
+    if not CTRL.cancelled:
+        try:
+            kb = C64KnowledgeBase()
+            old_stdout = sys.stdout
+            sys.stdout = StringIO()
+            kb.build_index()
+            out = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+            yield out
+        except Exception as e:
+            yield log_msg(f"ERRORE KB: {e}")
+            CTRL.running = False
             return
 
-        yield log_msg("Cerco codice Assembly...")
-        yield from run_cmd_gen(f'python pipeline/scrape_url.py "{url}" "web"')
-        if CTRL.cancelled:
-            return
-
-        yield log_msg("Estrazione PDF trovati...")
-        pdfs = []
-        for root, _, files in os.walk("data/input"):
-            for fname in files:
-                if fname.lower().endswith(".pdf"):
-                    pdfs.append(os.path.join(root, fname))
-                elif fname.lower().endswith(".d64"):
-                    yield from run_cmd_gen(
-                        f'python pipeline/extract_d64.py "{os.path.join(root, fname)}" "{root}"'
-                    )
-                elif fname.lower().endswith(".g64"):
-                    yield from run_cmd_gen(
-                        f'python pipeline/extract_g64.py "{os.path.join(root, fname)}" "{root}"'
-                    )
-                elif fname.lower().endswith(".prg"):
-                    yield from run_cmd_gen(
-                        f'python pipeline/extract_prg.py "{os.path.join(root, fname)}" "{root}"'
-                    )
-
-        if pdfs:
-            combined = []
-            for i, pdf_path in enumerate(pdfs):
-                tmp_base = f"data/output/raw_pdf{i}"
-                yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
-                yield from run_cmd_gen(
-                    f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
-                )
-                tmp = tmp_base + ".txt"
-                if os.path.exists(tmp):
-                    with open(tmp) as f:
-                        combined.append(f.read())
-                    for _ext in [".txt", ".md", ".meta.json"]:
-                        try:
-                            os.remove(tmp_base + _ext)
-                        except:
-                            pass
-            with open("data/output/raw.txt", "w") as f:
-                f.write("\n\n".join(combined))
-            yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
-            yield log_msg("Pulizia testo...")
-            yield from run_cmd_gen(
-                "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
-            )
-            yield log_msg("Generazione dataset...")
-            yield from run_cmd_gen(
-                "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
-            )
-        else:
-            yield log_msg("Nessun PDF trovato.")
-
-        yield log_msg("Ricostruzione KB...")
-        if not CTRL.cancelled:
-            try:
-                kb = C64KnowledgeBase()
-                old_stdout = sys.stdout
-                sys.stdout = StringIO()
-                kb.build_index()
-                out = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-                yield out
-            except Exception as e:
-                yield log_msg(f"ERRORE KB: {e}")
-                return
-
-        yield log_msg("COMPLETATO")
-
+    yield log_msg("COMPLETATO")
     CTRL.running = False
 
 
@@ -2247,206 +2040,117 @@ def launch_ui():
                 fn=get_hints, inputs=chat_interface.textbox, outputs=hints_md
             )
 
-        def on_scrape_batch(selected):
+        def on_kb_sync():
             CTRL.reset()
             CTRL.start_time = time.time()
             CTRL.running = True
-            if not selected:
-                yield "Seleziona almeno un sito."
-                CTRL.running = False
-                return
-            predefined_names = {k for k, _ in PREDEFINED}
-            predefined_sel = [s for s in selected if s in predefined_names]
-            custom_sites = load_custom_sites()
-            custom_sel = [s for s in custom_sites if s["name"] in selected]
-
-            for s in predefined_sel:
-                if CTRL.cancelled:
-                    yield log_msg("ANNULLATO")
-                    break
-                yield log_msg(f"Scraping: {s}")
-                yield from run_cmd_gen(
-                    f"python pipeline/c64_asm_scraper.py --sites {s} --delay 1.5"
-                )
-
-            for s in custom_sel:
-                if CTRL.cancelled:
-                    yield log_msg("ANNULLATO")
-                    break
-                yield log_msg(f"Scraping: {s['name']}")
-                yield log_msg("  Cerco PDF...")
-                yield from run_cmd_gen(f'python pipeline/scrape_docs.py "{s["url"]}"')
-                if CTRL.cancelled:
-                    yield log_msg("ANNULLATO")
-                    break
-                yield log_msg("  Cerco codice Assembly...")
-                yield from run_cmd_gen(
-                    f'python pipeline/scrape_url.py "{s["url"]}" "{s["name"]}"'
-                )
-
-            if not CTRL.cancelled:
-                yield log_msg("Estrazione testo da PDF...")
-                pdfs = []
-                for root, _, files in os.walk("data/input"):
-                    for fname in files:
-                        if fname.lower().endswith(".pdf"):
-                            pdfs.append(os.path.join(root, fname))
-                if pdfs:
-                    combined = []
-                    for i, pdf_path in enumerate(pdfs):
-                        tmp_base = f"data/output/raw_pdf{i}"
-                        yield log_msg(f"  Elaboro: {os.path.basename(pdf_path)}")
-                        yield from run_cmd_gen(
-                            f'python pipeline/pdf2marker.py "{pdf_path}" "{tmp_base}"'
-                        )
-                        tmp = tmp_base + ".txt"
-                        if os.path.exists(tmp):
-                            with open(tmp) as f:
-                                combined.append(f.read())
-                            for _ext in [".txt", ".md", ".meta.json"]:
-                                try:
-                                    os.remove(tmp_base + _ext)
-                                except:
-                                    pass
-                    with open("data/output/raw.txt", "w") as f:
-                        f.write("\n\n".join(combined))
-                    yield log_msg(f"  Uniti {len(pdfs)} PDF in data/output/raw.txt")
-                    yield log_msg("Pulizia testo...")
-                    yield from run_cmd_gen(
-                        "python pipeline/text_cleaner.py data/output/raw.txt data/output/clean.txt"
-                    )
-                    yield log_msg("Generazione dataset...")
-                    yield from run_cmd_gen(
-                        "python pipeline/build_dataset.py data data/output/dataset_unified.jsonl"
+            yield log_msg("Avvio sincronizzazione dei dati da C64-KB-Agent...")
+            try:
+                from pipeline.acquisition.scrapy_kb_adapter import ScrapyKBAdapter
+                adapter = ScrapyKBAdapter()
+                res = adapter.sync()
+                if res["status"] == "ok":
+                    yield log_msg(
+                        f"Sincronizzazione completata!\n"
+                        f"  - File Ingeriti/Aggiornati: {res['synced']} (Nuovi: {res['new']}, Aggiornati: {res['updated']})\n"
+                        f"  - File Invariati: {res['unchanged']}"
                     )
                 else:
-                    yield log_msg("Nessun PDF da processare.")
-
-                yield log_msg("Ricostruisco KB...")
-                try:
-                    kb = C64KnowledgeBase()
-                    old_stdout = sys.stdout
-                    sys.stdout = StringIO()
-                    kb.build_index()
-                    out = sys.stdout.getvalue()
-                    sys.stdout = old_stdout
-                    yield out + log_msg("KB aggiornata.")
-                except Exception as e:
-                    yield f"[ERRORE] KB: {e}"
+                    yield log_msg(f"Errore durante la sincronizzazione: {res['message']}")
+            except Exception as e:
+                yield log_msg(f"Errore: {e}")
             CTRL.running = False
 
-        with gr.Tab("Scarica e Siti"):
-            gr.Markdown("## Scarica URL")
+        def on_run_spider(spider_name):
+            if not spider_name:
+                yield "Seleziona uno spider."
+                return
+            CTRL.reset()
+            CTRL.start_time = time.time()
+            CTRL.running = True
+            yield log_msg(f"Avvio dello spider C64-Scrapy '{spider_name}'...")
+            try:
+                from pipeline.acquisition.scrapy_kb_adapter import ScrapyKBAdapter
+                adapter = ScrapyKBAdapter()
+                res = adapter.run_scrapy_spider(spider_name)
+                if res["status"] == "ok":
+                    yield log_msg(f"Spider completato con successo!")
+                    yield log_msg(f"Sorgente:\n{res['spider_stdout']}")
+                    sync_res = res.get("sync_result", {})
+                    if sync_res:
+                        yield log_msg(
+                            f"Sincronizzazione post-spider completata:\n"
+                            f"  - File Sincronizzati: {sync_res.get('synced', 0)}\n"
+                            f"  - File Invariati: {sync_res.get('unchanged', 0)}"
+                        )
+                else:
+                    yield log_msg(f"Errore esecuzione spider: {res['message']}")
+                    if "details" in res:
+                        yield log_msg(f"Dettagli:\n{res['details']}")
+            except Exception as e:
+                yield log_msg(f"Errore: {e}")
+            CTRL.running = False
+
+        def on_kb_rebuild():
+            CTRL.reset()
+            CTRL.start_time = time.time()
+            CTRL.running = True
+            yield log_msg("Avvio ricostruzione dell'indice vettoriale FAISS...")
+            try:
+                old_stdout = sys.stdout
+                sys.stdout = StringIO()
+                kb = C64KnowledgeBase()
+                kb.build_index()
+                out = sys.stdout.getvalue()
+                sys.stdout = old_stdout
+                yield out
+                yield log_msg("Indice FAISS ricostruito con successo!")
+            except Exception as e:
+                yield log_msg(f"Errore: {e}")
+            CTRL.running = False
+
+        with gr.Tab("Integrazione C64-KB-Agent"):
+            gr.Markdown(
+                "## 🔄 Integrazione Multi-Repository (C64-Scrapy ➔ C64-KB-Agent ➔ C64-LLM)\n"
+                "In linea con la filosofia Unix **KISS** e **DRY**, questo modulo delega il web crawling e scraping a "
+                "**C64-Scrapy** e la standardizzazione a **C64-KB-Agent**. L'LLM gestisce la sincronizzazione locale e il RAG."
+            )
+
             with gr.Row():
                 with gr.Column(scale=2):
-                    url_input = gr.Textbox(
-                        label="URL",
-                        placeholder="https://...manuale.pdf  o  archive.org/details/...  o  https://drive.google.com/drive/folders/...",
+                    gr.Markdown("### Sincronizzazione Conoscenza")
+                    sync_btn = gr.Button("🔄 Sincronizza da C64-KB-Agent", variant="primary")
+
+                    gr.Markdown("### Avvio Spider C64-Scrapy")
+                    spider_dropdown = gr.Dropdown(
+                        choices=[name for name, _ in PREDEFINED],
+                        value="6502org",
+                        label="Seleziona spider da avviare",
                     )
-                    with gr.Row():
-                        download_btn = gr.Button(
-                            "Scarica URL", variant="primary", size="sm"
-                        )
+                    run_spider_btn = gr.Button("🕷️ Avvia Spider", variant="secondary")
 
-                    gr.Markdown("## Scrapa Siti")
-                    site_list = gr.CheckboxGroup(
-                        choices=all_site_choices(),
-                        label="Seleziona siti da scrapare",
-                        value=[],
+                    gr.Markdown("### Ricostruzione Indice Local RAG")
+                    rebuild_index_btn = gr.Button("🛠️ Ricostruisci Indice FAISS", variant="stop")
+
+                    main_log = gr.Textbox(label="Log Integrazione", lines=18, max_lines=40)
+
+                    sync_btn.click(
+                        fn=on_kb_sync, inputs=[], outputs=main_log
                     )
-                    with gr.Row():
-                        scrape_btn = gr.Button(
-                            "Scrapa Selezionati", variant="primary", size="sm"
-                        )
-
-                    with gr.Row():
-                        pause_btn = gr.Button("Pausa", size="sm")
-                        resume_btn = gr.Button("Riprendi", size="sm")
-                        cancel_btn = gr.Button("Annulla", variant="stop", size="sm")
-
-                    main_log = gr.Textbox(label="Log", lines=18, max_lines=40)
-
-                    def on_download_only(url):
-                        if not url:
-                            yield "Inserisci un URL."
-                            return
-                        CTRL.reset()
-                        CTRL.start_time = time.time()
-                        CTRL.running = True
-                        for msg in download_and_integrate(url):
-                            yield msg
-                            if CTRL.cancelled:
-                                yield log_msg("ANNULLATO")
-                                break
-                        if not CTRL.cancelled:
-                            yield log_msg("COMPLETATO")
-                        CTRL.running = False
-
-                    def on_scrape_only(sites):
-                        for msg in on_scrape_batch(sites):
-                            yield msg
-
-                    download_btn.click(
-                        fn=on_download_only, inputs=url_input, outputs=main_log
+                    run_spider_btn.click(
+                        fn=on_run_spider, inputs=[spider_dropdown], outputs=main_log
                     )
-                    scrape_btn.click(
-                        fn=on_scrape_only, inputs=site_list, outputs=main_log
+                    rebuild_index_btn.click(
+                        fn=on_kb_rebuild, inputs=[], outputs=main_log
                     )
-                    pause_btn.click(fn=CTRL.pause, outputs=[], queue=False)
-                    resume_btn.click(fn=CTRL.resume, outputs=[], queue=False)
-                    cancel_btn.click(fn=CTRL.cancel, outputs=[], queue=False)
 
                 with gr.Column(scale=1):
-                    gr.Markdown("### Gestione siti")
-                    new_name = gr.Textbox(label="Nome", placeholder="es. mio-sito-c64")
-                    new_url = gr.Textbox(
-                        label="URL", placeholder="https://nuovo-sito-c64.it/"
-                    )
-                    add_btn = gr.Button("Aggiungi", size="sm")
-                    add_msg = gr.Textbox(label="", lines=1)
-                    del_dropdown = gr.Dropdown(
-                        choices=[s["name"] for s in load_custom_sites()],
-                        label="Rimuovi sito",
-                    )
-                    del_btn = gr.Button("Rimuovi", variant="stop", size="sm")
-                    del_msg = gr.Textbox(label="", lines=1)
-
-                    def on_add_site(name, url):
-                        if not name or not url:
-                            return "Inserisci nome e URL.", gr.CheckboxGroup(
-                                choices=all_site_choices()
-                            )
-                        save_custom_site(name.strip(), url.strip())
-                        return f"Sito '{name}' aggiunto!", gr.CheckboxGroup(
-                            choices=all_site_choices()
-                        )
-
-                    def on_del_site(name):
-                        if not name:
-                            return (
-                                "Seleziona un sito da rimuovere.",
-                                gr.Dropdown(
-                                    choices=[s["name"] for s in load_custom_sites()]
-                                ),
-                                gr.CheckboxGroup(choices=all_site_choices()),
-                            )
-                        remove_custom_site(name)
-                        remaining = [s["name"] for s in load_custom_sites()]
-                        return (
-                            f"Sito '{name}' rimosso!",
-                            gr.Dropdown(choices=remaining),
-                            gr.CheckboxGroup(choices=all_site_choices()),
-                        )
-
-                    add_btn.click(
-                        fn=on_add_site,
-                        inputs=[new_name, new_url],
-                        outputs=[add_msg, site_list],
-                    )
-                    del_btn.click(
-                        fn=on_del_site,
-                        inputs=del_dropdown,
-                        outputs=[del_msg, del_dropdown, site_list],
+                    gr.Markdown("### ℹ️ Stato Ecosistema")
+                    gr.Markdown(
+                        "**C64-KB-Agent** è definita come la **sola base di conoscenza**.\n\n"
+                        "I file vengono organizzati e validati nell'Hub prima di essere importati in questo agent "
+                        "tramite il `ScrapyKBAdapter`.\n\n"
+                        "L'indice locale viene memorizzato in `data/db/` ed è sincronizzato per query RAG fulminee."
                     )
 
         with gr.Tab("Knowledge Base"):
