@@ -142,6 +142,61 @@ class NanoGPTPrepper:
         logger.info(f"BPE tokenization complete. Total tokens: {len(ids)}. Vocab size: {vocab_size}")
         return ids, vocab_size
 
+    def tokenize_custom_bpe(self, text):
+        """
+        Trains a custom Byte-Pair Encoding (BPE) tokenizer on the corpus
+        using HuggingFace tokenizers library and tokenizes the corpus with it.
+        """
+        logger.info("Using C64 custom BPE tokenization...")
+        try:
+            from tokenizers import Tokenizer
+            from tokenizers.models import BPE
+            from tokenizers.trainers import BpeTrainer
+            from tokenizers.pre_tokenizers import Whitespace
+        except ImportError:
+            logger.warning("tokenizers library not installed. Falling back to GPT-2 BPE.")
+            return self.tokenize_bpe(text)
+
+        tok_path = self.output_dir / "tokenizer_c64.json"
+        if tok_path.exists():
+            logger.info(f"Loading existing custom C64 tokenizer from {tok_path}")
+            tokenizer = Tokenizer.from_file(str(tok_path))
+        else:
+            logger.info("Training new custom C64 BPE tokenizer on compiled corpus...")
+            tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
+            tokenizer.pre_tokenizer = Whitespace()
+            trainer = BpeTrainer(special_tokens=["[UNK]", "<|endoftext|>"], vocab_size=8192)
+
+            temp_file = self.output_dir / "temp_corpus.txt"
+            with open(temp_file, "w", encoding="utf-8") as f:
+                f.write(text)
+
+            tokenizer.train([str(temp_file)], trainer)
+            tokenizer.save(str(tok_path))
+            logger.info(f"Custom C64 BPE tokenizer trained and saved to {tok_path}")
+
+            if temp_file.exists():
+                temp_file.unlink()
+
+        output = tokenizer.encode(text)
+        ids = output.ids
+        vocab_size = tokenizer.get_vocab_size()
+
+        # Save metadata for nanoGPT
+        stoi = tokenizer.get_vocab()
+        itos = {i: s for s, i in stoi.items()}
+        meta = {
+            'vocab_size': vocab_size,
+            'itos': itos,
+            'stoi': stoi,
+        }
+        meta_path = self.output_dir / "meta.pkl"
+        with open(meta_path, 'wb') as f:
+            pickle.dump(meta, f)
+
+        logger.info(f"Custom BPE tokenization complete. Total tokens: {len(ids)}. Vocab size: {vocab_size}")
+        return ids, vocab_size
+
     def prepare(self, tokenization_mode="gpt2"):
         """
         Runs the full pipeline to generate train.bin and val.bin.
@@ -155,6 +210,8 @@ class NanoGPTPrepper:
             ids, vocab_size = self.tokenize_char(corpus)
         elif tokenization_mode == "gpt2":
             ids, vocab_size = self.tokenize_bpe(corpus)
+        elif tokenization_mode == "c64_custom":
+            ids, vocab_size = self.tokenize_custom_bpe(corpus)
         else:
             raise ValueError(f"Unknown tokenization mode: {tokenization_mode}")
 

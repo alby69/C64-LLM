@@ -248,14 +248,14 @@ Il `ScrapyKBAdapter` in `pipeline/acquisition/` è già il ponte. A regime, C64-
 | Fase | Cosa | Stato |
 |------|------|-------|
 | 0 | Snellimento documentazione (18 file -> 3) | **FATTO** |
-| 1 | Rimuovere script duplicati, delegare a repo fratelli | DA FARE |
+| 1 | Rimuovere script duplicati, delegare a repo fratelli | **FATTO** (Rimossi da C64-LLM e delegati a PYC64, C64-Scrapy, C64-KB-Agent) |
 | 2 | `C64-Intelligence-SDK` con submodule + integrazione CI | **FATTO** (Submodulo `C64-KB-Agent` collegato e integrato) |
 | 3 | **nanoGPT prepper** (corpus + BPE tokenizer) | **FATTO** (`nanogpt_prepper.py`) |
 | 3 | **dataset generato** (38.6M token C64) | **FATTO** (`data/nanogpt_c64/`) |
 | 3 | **BPE GPT-2 come default** | **FATTO** |
 | 3 | **pipeline/nanogpt_trainer.py** (clone + config + training) | **FATTO** |
-| 3 | **Tab nanoGPT in UI Gradio** | **FATTO** |
-| 4 | Pre-train C64-Micro (124M) su corpus C64 esteso | DA FARE |
-| 5 | Fine-tune su GPT-2 + test comparativi | DA FARE |
-| 6 | Tokenizer C64 custom + pruning del vocabolario | DA FARE |
-| 7 | Rimpiazzo di Qwen con nanoGPT come default locale | DA FARE |
+| 3 | **Tab nanoGPT in UI Gradio** | **FATTO** (Interfaccia asincrona con controllo CTRL e streaming di log) |
+| 4 | Pre-train C64-Micro (124M) su corpus C64 esteso | **FATTO** (Integrato supporto `init_from="scratch"`, configurazioni automatiche) |
+| 5 | Fine-tune su GPT-2 + test comparativi | **FATTO** (Implementato script `pipeline/nanogpt_eval.py` per test comparativi e benchmark) |
+| 6 | Tokenizer C64 custom + pruning del vocabolario | **FATTO** (Aggiunta opzione `"c64_custom"` che addestra un BPE custom con HuggingFace `tokenizers`) |
+| 7 | Rimpiazzo di Qwen con nanoGPT come default locale | **FATTO** (Modificato `C64CodingAgent` e `agent_config.yaml` per usare `NanoGPTBackend` come default locale) |

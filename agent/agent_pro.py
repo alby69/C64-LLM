@@ -136,15 +136,27 @@ def _domain_name(url: str) -> str:
 class C64CodingAgent:
     def __init__(
         self,
-        base_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        base_model_name=None,
         lora_path=None,
         gguf_path=None,
     ):
-        if gguf_path and os.path.exists(gguf_path):
+        self.pm = PromptManager()
+        backend_type = self.pm.config.get("model", {}).get("backend", "nanoGPT")
+
+        if backend_type == "nanoGPT":
+            from agent.model_backend import NanoGPTBackend
+            nano_cfg = self.pm.config.get("model", {}).get("nanoGPT", {})
+            model_path = nano_cfg.get("model_path", "data/models/c64-micron.pt")
+            tokenizer_name = nano_cfg.get("tokenizer", "gpt2")
+            print(f"Loading predefinito nanoGPT: {model_path}")
+            self.backend = NanoGPTBackend(model_path, tokenizer_name)
+            self.tokenizer = self.backend.tokenizer
+        elif gguf_path and os.path.exists(gguf_path):
             print(f"Loading GGUF model for CPU: {gguf_path}")
             self.backend = LlamaCppBackend(gguf_path)
             self.tokenizer = None
         else:
+            base_model_name = base_model_name or self.pm.config.get("agent", {}).get("model_name", "Qwen/Qwen2.5-Coder-1.5B-Instruct")
             try:
                 bnb_config = BitsAndBytesConfig(
                     load_in_4bit=True,
@@ -176,10 +188,9 @@ class C64CodingAgent:
                 print(
                     "Falling back to CPU-only mode (Mock/GGUF placeholder if path missing)"
                 )
-                self.backend = LlamaCppBackend(gguf_path)
+                self.backend = LlamaCppBackend(gguf_path or self.pm.config.get("model", {}).get("gguf", {}).get("path"))
                 self.tokenizer = None
 
-        self.pm = PromptManager()
         self.orchestrator = OrchestratorAgent(self.backend, self.tokenizer, pm=self.pm)
         self._current_lora = None
 
@@ -2406,7 +2417,7 @@ def launch_ui():
             )
 
             nanogpt_status = gr.Textbox(label="Stato", value="Pronto", interactive=False)
-            nanogpt_log = gr.Textbox(label="Log", lines=12, max_lines=24, interactive=False)
+            nanogpt_log = gr.Textbox(label="Log / Loss Curve", lines=15, max_lines=30, interactive=False)
 
             with gr.Row():
                 nanogpt_prepare_btn = gr.Button("Prepara Corpus", variant="secondary")
@@ -2420,7 +2431,7 @@ def launch_ui():
                     value="124M (micro)",
                 )
                 nanogpt_init = gr.Radio(
-                    ["scratch", "gpt2", "gpt2-medium"],
+                    ["scratch", "gpt2", "gpt2-medium", "resume"],
                     label="Inizializzazione",
                     value="scratch",
                 )
@@ -2438,22 +2449,47 @@ def launch_ui():
                 return "Pronto" if ok else "Errore"
 
             def on_nanogpt_train(model_size, init, lr, max_iters, batch_size, block_size):
-                from pipeline.nanogpt_trainer import NanoGPTTrainer
+                CTRL.reset()
+                CTRL.start_time = time.time()
+                CTRL.running = True
+
                 size_map = {"124M (micro)": "124M", "350M (base)": "350M"}
+                model_sz = size_map.get(model_size, "124M")
+
+                from pipeline.nanogpt_trainer import NanoGPTTrainer
                 trainer = NanoGPTTrainer()
                 if not trainer.ensure_repo():
-                    return "Errore: impossibile clonare nanoGPT"
+                    yield log_msg("Errore: impossibile clonare nanoGPT")
+                    return
                 trainer.link_data()
                 trainer.write_config(
-                    model_size=size_map.get(model_size, "124M"),
+                    model_size=model_sz,
                     init_from=init,
                     batch_size=int(batch_size),
                     block_size=int(block_size),
                     lr=float(lr),
                     max_iters=int(max_iters),
                 )
-                ok = trainer.train(capture_output=True)
-                return "Training completato" if ok else "Training fallito (vedi log)"
+
+                cmd = f"python pipeline/nanogpt_trainer.py --model-size {model_sz} --init-from {init} --batch-size {int(batch_size)} --block-size {int(block_size)} --lr {float(lr)} --max-iters {int(max_iters)}"
+                yield log_msg("Avvio training nanoGPT...")
+                for msg in run_cmd_gen(cmd):
+                    yield msg
+                    if CTRL.cancelled:
+                        break
+
+                if not CTRL.cancelled:
+                    yield log_msg("✅ Training nanoGPT completato!")
+                    # Auto-conversione in GGUF
+                    trainer.convert_to_gguf()
+                else:
+                    yield log_msg("🛑 Training terminato manuale.")
+
+                CTRL.running = False
+
+            def on_nanogpt_stop():
+                CTRL.cancel()
+                return "Training interrotto manualmente."
 
             nanogpt_prepare_btn.click(
                 fn=on_nanogpt_prepare,
@@ -2465,7 +2501,7 @@ def launch_ui():
                 outputs=[nanogpt_log],
             )
             nanogpt_stop_btn.click(
-                fn=lambda: "Fermo manuale",
+                fn=on_nanogpt_stop,
                 outputs=[nanogpt_log],
             )
 
