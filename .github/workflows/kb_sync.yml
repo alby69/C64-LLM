@@ -1,0 +1,58 @@
+name: C64 Knowledge Base Sync and RAG Index Build
+
+on:
+  push:
+    branches:
+      - main
+  repository_dispatch:
+    types: [kb_updated]
+  schedule:
+    # Esegui ogni notte alle 02:00
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync_and_rebuild:
+    name: Sync Knowledge Base & Rebuild FAISS Index
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout C64-LLM Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Assicurati che le librerie necessarie siano installate
+          pip install python-frontmatter faiss-cpu sentence-transformers langchain-core langchain-text-splitters
+
+      - name: Clone C64-KB-Agent (Primary Knowledge Base)
+        run: |
+          git clone --depth 1 https://github.com/alby69/C64-KB-Agent.git ../C64-KB-Agent
+
+      - name: Run ScrapyKBAdapter Sync
+        run: |
+          python -c "
+          from pipeline.acquisition.scrapy_kb_adapter import ScrapyKBAdapter
+          adapter = ScrapyKBAdapter()
+          res = adapter.sync()
+          print('Sync result:', res)
+          "
+
+      - name: Rebuild FAISS Vector Store Index
+        run: |
+          python agent/knowledge_base.py
+
+      - name: Run Integration Tests
+        run: |
+          export PYTHONPATH=.
+          pytest tests/ -v
