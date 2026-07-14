@@ -1,222 +1,82 @@
-# C64 Multi-Agent Coding Assistant
+# C64-LLM
 
-Questo progetto è un assistente alla programmazione specializzato per il **Commodore 64**, capace di generare codice **Assembly 6502** e **BASIC v2**. Utilizza un'architettura multi-agente avanzata e un sistema RAG (Retrieval-Augmented Generation).
+Assistente alla programmazione C64 con architettura multi-agente, RAG, validazione automatica e knowledge distillation.
 
-## 🚀 Caratteristiche Principali
+## Architettura
 
-- **Architettura Multi-Agente**: Researcher, Coder, Validator, e Orchestrator lavorano insieme con meccanismo di **Self-Healing**.
-- **C64 Knowledge Engine**: Sistema RAG avanzato con FAISS, embedding vettoriali e Wiki-links Obsidian.
-- **Wiki Grafo Interattivo**: Mappa concettuale SVG con 87 nodi, 105 archi, zoom/pan, gruppi collassabili multilivello e mappa connessioni.
-- **Performance Aware**: Include un **Cycle Counter** per Assembly e validazione sintattica rigorosa per BASIC v2.
-- **Pure-Python Simulator**: Integrazione con `py6502` per "dry run" del codice Assembly generato, rilevamento loop infiniti e istruzioni illegali.
-- **Automated Disassembler**: Disassemblaggio automatico dei file `.PRG` estratti per arricchire la Knowledge Base con codice leggibile.
-- **Configurabile & Estensibile**: Gestione tramite `agent_config.yaml` e Prompt Management System (PMS).
-
-## 📂 Struttura del Progetto
-
-- `agent/`: Logica degli agenti, sistema RAG e rendering Wiki Grafo SVG.
-- `docs/`: Documentazione tecnica consolidata.
-- `data/`: Dati persistenti (PDF, dataset, modelli, grafo conoscenze).
-- `pipeline/`: Script per la preparazione del dataset e crawling proattivo.
-- `utils/`: Strumenti di validazione, cycle counting e utility.
-- `config/`: Configurazioni di sistema e sorgenti.
-- `prompts/`: Repository centrale dei prompt.
-
-## 🛠️ Installazione e Utilizzo
-
-### Requisiti
-- Python 3.10+
-- ACME Assembler (per la validazione del codice, già installato nell'immagine Docker)
-  - Su host: compila da sorgente su https://github.com/lngtklnz/ACME/ o `brew install acme` (macOS)
-
-### Setup
-```bash
-pip install -r requirements.txt
+```
+ C64-Scrapy ──→ C64-KB-Agent ──→ C64-LLM (questo repo)
+ (scraping)      (standardizza)    │
+                                   ├─ Orchestrator (auto-guarigione)
+                                   │   ├─ Researcher (RAG FAISS)
+                                   │   ├─ Coder (BASIC/Assembly)
+                                   │   └─ Validator (ACME + py6502)
+                                   ├─ Knowledge Distillation
+                                   ├─ nanoGPT prepper
+                                   └─ Interfaccia Gradio
 ```
 
-### Avvio dell'Interfaccia PRO (Gradio)
+## Componenti Core
+
+| Componente | File | Ruolo |
+|-----------|------|-------|
+| Orchestrator | `agent/orchestrator.py` | Ciclo Researcher→Coder→Validator con self-healing (fino a 3 tentativi) |
+| Researcher | `agent/researcher.py` | Espansione query, retrieval FAISS, HyDE (disabilitato di default) |
+| Coder | `agent/coder.py` | Generazione codice con profili BASIC/Assembly |
+| Validator | `agent/validator.py` | Linter BASIC, branch range, ACME, py6502 simulazione, cycle counting |
+| RAG | `agent/knowledge_base.py` | FAISS + sentence-transformers, chunk 2000/200, filtri PDF |
+| Distiller | `pipeline/knowledge_distiller.py` | 5 teacher backends (OpenCode, Groq, OpenRouter, Ollama, HuggingFace) |
+| LoRA Trainer | `pipeline/train_lora.py` | LoRA su Qwen con auto CPU/GPU detection |
+| nanoGPT Prepper | `pipeline/nanogpt_prepper.py` | Corpus C64 + tokenizzazione char/BPE → train.bin/val.bin |
+| UI | `agent/agent_pro.py` | Gradio 5 tab (Chat, Download, KB, Distill, Dati + Wiki Graph) |
+
+## Quickstart
+
 ```bash
+pip install -r requirements.txt
 python -m agent.agent_pro
 ```
 
-## 🐳 Docker Quickstart
+### Versioni lunghe
 
-### Prerequisiti
-- Docker e Docker Compose installati
-- **Su CPU**: scarica un modello GGUF (obbligatorio, vedi sotto)
-- GPU NVIDIA con [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/) (opzionale)
+- `python pipeline/extract_d64.py <file.d64> <output/>` — estrae BASIC da dischi
+- `python pipeline/extract_prg.py <file.prg> <output/>` — estrae BASIC/ML da PRG
+- `python pipeline/pdf2marker.py <input.pdf> <output/>` — PDF → Markdown
+- `python pipeline/build_dataset.py <data/dir> <output.jsonl>` — dataset Q/A
+- `python pipeline/train_lora.py <dataset.jsonl>` — LoRA fine-tuning
+- `python pipeline/nanogpt_prepper.py char` — prepara corpus per nanoGPT
 
-### Setup modello (CPU)
-Su CPU serve un modello in formato GGUF:
-```bash
-# Crea la cartella e scarica il modello
-mkdir -p data/models
-wget -O data/models/qwen2.5-coder-1.5b.Q4_K_M.gguf https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf
-```
-Il `docker-compose.yml` punta già a questo percorso con `GGUF_MODEL_PATH`.
+## Docker
 
-### Build dell'immagine
 ```bash
 docker compose build
+docker compose up c64-ui              # Gradio su :7860
+docker compose run c64-pipeline       # pipeline dati
+docker compose up c64-train           # LoRA training
 ```
 
-### Avvio interfaccia Gradio (UI)
-```bash
-docker compose up c64-ui
-```
-L'interfaccia sarà disponibile su [http://localhost:7860](http://localhost:7860).
+Il modello GGUF va in `data/models/`. Default: Qwen 2.5 Coder 1.5B.
 
-### Pipeline dati (PDF → Markdown + testo → dataset)
-```bash
-# Metti i tuoi PDF in ./data/input/
-mkdir -p data/input data/output
+## Riferimenti esterni
 
-# Esegui l'intera pipeline (PDF → dataset, via marker-pdf)
-docker compose run c64-pipeline
+Questo progetto è parte dell'ecosistema [C64-Intelligence-SDK](https://github.com/alby69/C64-Intelligence-SDK) e si integra con:
+- **C64-Scrapy** — motore di scraping web specializzato
+- **C64-KB-Agent** — knowledge base standardizzata
+- **PYC64** — utility Python per C64 (dischi, PRG, disassemblamento)
 
-# Oppure imposta manualmente il PDF da processare
-INPUT_PDF=mio_documento.pdf docker compose up c64-pipeline
-```
-
-### Training LoRA
-```bash
-docker compose up c64-train
-```
-Il modello addestrato verrà salvato in `./data/models/c64-lora-pro/`.
-
-#### Note per CPU:
-- Il training rileva automaticamente la CPU e usa il modello `Qwen/Qwen2.5-Coder-0.5B-Instruct`
-- `max_length=512`, `batch_size=1`, `gradient_accumulation_steps=2`
-- Evaluation e salvataggio checkpoint disabilitati per velocità
-- Gradient clipping (`max_grad_norm=1.0`) e learning rate ridotto (`1e-4`) per stabilità
-- Default UI: `Max sequence length` = 512 (regolabile fino a 4096 per GPU)
-
-### Altri comandi utili
-```bash
-# Convertire PDF in Markdown + testo (via marker-pdf)
-docker compose run c64-pipeline python pipeline/pdf2marker.py /app/data/input/manuale.pdf /app/data/output/manuale
-
-# Pulire il testo estratto (solo .txt, marker produce già .md strutturato)
-docker compose run c64-pipeline python pipeline/text_cleaner.py /app/data/output/manuale.txt /app/data/output/manuale_clean.txt
-
-# Generare dataset
-docker compose run c64-pipeline python pipeline/build_dataset.py /app/data /app/data/output/dataset_unified.jsonl
-
-# Costruire l'indice vettoriale (Knowledge Base)
-docker compose run c64-pipeline python agent/knowledge_base.py
-
-# Estrarre BASIC/ML da un disco D64
-docker compose run c64-pipeline python pipeline/extract_d64.py /app/data/input/disk.d64 /app/data/output/
-
-# Estrarre BASIC/ML da un disco G64
-docker compose run c64-pipeline python pipeline/extract_g64.py /app/data/input/disk.g64 /app/data/output/
-
-# Estrarre BASIC/ML da un file PRG
-docker compose run c64-pipeline python pipeline/extract_prg.py /app/data/input/program.prg /app/data/output/
-
-# Eseguire i test
-docker compose run c64-pipeline python -m pytest tests/ -v
-```
-
-### Volume dati
-Tutti i dati persistenti (PDF, output, modelli) sono in `./data/`, montato come volume in `/app/data` nel container.
-
-## 📚 Popolare la Knowledge Base (RAG)
-
-La Knowledge Base alimenta il sistema RAG con documentazione tecnica C64.
-
-### Workflow rapido (minimo indispensabile)
-
-```bash
-# 1. Scarica documentazione Assembly da siti C64
-docker compose run --rm c64-pipeline python pipeline/c64_asm_scraper.py --sites 6502org codebase64 c64wiki --delay 1.5
-
-# 2. Ricostruisci l'indice vettoriale
-docker compose run --rm c64-pipeline python agent/knowledge_base.py
-
-# 3. Riavvia l'UI
-docker compose restart c64-ui
-```
-
-### Alternative per aggiungere dati
-
-- **PDF**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline`
-- **Dischi D64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_d64.py /app/data/input/disk.d64 /app/data/input/`
-- **Dischi G64**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_g64.py /app/data/input/disk.g64 /app/data/input/`
-- **PRG**: metti i file in `./data/input/`, poi esegui `docker compose run c64-pipeline python pipeline/extract_prg.py /app/data/input/program.prg /app/data/input/`
-- **Archive.org (UI)**: inserisci l'URL dell'item (es. `https://archive.org/details/c64-programmer-ref`).
-  Il sistema seleziona automaticamente il miglior formato disponibile (TXT > EPUB > HTML > PDF) e scarica un solo file.
-- **Markdown manuali**: crea file `.md` in `./knowledge_base/` con frontmatter YAML:
-  ```markdown
-  ---
-  title: "Nome Documento"
-  tags: [c64, assembly]
-  ---
-  Contenuto...
-  ```
-
-**Nota importante**: La conversione PDF usa **pdf2marker.py** che sceglie automaticamente il motore:
-- **marker-pdf** (se installato, `pip install marker-pdf`): produce `.md` strutturato (layout detection + OCR) + `.txt` + `.meta.json`. I `.md` da marker entrano nella KB con source_boost=1.2.
-- **PyMuPDF/fitz** (default, leggero): produce solo `.txt` (nessun `.md`). I `_clean.txt` hanno boost=0.3.
-
-Per escludere tutti i file derivati da PDF, imposta `SKIP_PDF=1` nell'ambiente. I `.md` curati in `knowledge_base/` rimangono la fonte principale. marker-pdf è ~2GB di dipendenze (surya-ocr + texify) — installalo solo se serve markdown strutturato di alta qualità.
-
-## 🧠 Knowledge Distillation
-
-Il progetto include un sistema di **Teacher→Student distillation** per specializzare Qwen2.5-Coder-1.5B su C64.
-
-### Flusso
+## Struttura directory
 
 ```
-Teacher LLM (OpenCode / Groq / OpenRouter / Ollama)
-       │  Legge la Knowledge Base
-       │  Genera QA sintetiche (factual, code, explain, bugfix, theory)
-       ▼
-Dataset distillato (data/output/distill_dataset.jsonl)
-       │
-       ▼
-LoRA Fine-tuning → Qwen specializzato (data/models/c64-lora-pro/)
+agent/           agente multi-agente + RAG
+pipeline/        data pipeline (estrazione, pulizia, training)
+utils/           utility (cycle counter, prompt manager, py6502)
+config/          configurazioni YAML
+prompts/         repository prompt templates
+knowledge_base/  manuali C64 curati (9 file MD)
+data/
+  models/        GGUF + LoRA adapter
+  vectorstore/   indice FAISS
+  output/        PDF estratti + dataset
+  src/           sorgenti scartati
+  input/         file grezzi caricati
 ```
-
-### Teacher predefinito: OpenCode (gratuito)
-
-Nessuna API key. L'assistente OpenCode legge la KB e genera il dataset. Sono già state generate **76 QA pairs** che coprono tutti i 10 file KB.
-
-### Altri backend Teacher
-
-| Backend | Comando |
-|---------|---------|
-| **Groq** (gratuito) | `python pipeline/knowledge_distiller.py --teacher groq --generate` |
-| **OpenRouter** | `python pipeline/knowledge_distiller.py --teacher openrouter --model qwen/qwen3-32b --generate` |
-| **Ollama** | `python pipeline/knowledge_distiller.py --teacher ollama --model qwen3:32b --generate` |
-
-### Addestramento
-
-```bash
-python pipeline/train_lora.py data/output/distill_dataset.jsonl
-```
-
-### UI
-
-Il tab **Distillazione** nell'interfaccia Gradio permette di:
-- Selezionare backend, modello, tipi di dato e lingue
-- Generare il dataset con un click
-- Addestrare Qwen via LoRA
-- Monitorare lo stato
-
-### Documenti correlati
-- [docs/PIANO_DISTILLAZIONE.md](docs/PIANO_DISTILLAZIONE.md) — Piano dettagliato
-- [docs/FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md) — Cosa usa Qwen per rispondere
-- [docs/TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md) — Manuale tecnico completo
-
-## 📖 Documentazione
-- [TECHNICAL_MANUAL.md](docs/TECHNICAL_MANUAL.md): **Manuale Tecnico Completo.** Architettura, agenti, RAG e roadmap.
-- [ARCHITETTURA_E_COMPITI.md](docs/ARCHITETTURA_E_COMPITI.md): **Responsabilità Core.** Dettaglio dei compiti del sistema.
-- [REFACTORING_PLAN.md](docs/REFACTORING_PLAN.md): **Piano di Refactoring.** Strategia per il disaccoppiamento e l'integrazione di C64-Scrapy.
-- [UI_MANUAL.md](docs/UI_MANUAL.md): **Manuale dell'Interfaccia Utente.** Descrizione di tutti i tab e controlli.
-- [WIKI_GRAPH.md](docs/WIKI_GRAPH.md): **Tutorial Wiki Grafo.** Struttura, interazione, architettura tecnica e come aggiungere nodi/gruppi.
-- [FONTI_DELLA_CONOSCENZA.md](docs/FONTI_DELLA_CONOSCENZA.md): **Fonti usate da Qwen.** KB, prompt, flusso RAG.
-- [PIANO_DISTILLAZIONE.md](docs/PIANO_DISTILLAZIONE.md): **Piano di Knowledge Distillation.** Teacher→Student, dataset, training.
-
----
-*Progetto sviluppato per preservare e potenziare l'arte della programmazione su sistemi 8-bit.*
