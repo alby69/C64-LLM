@@ -1,0 +1,3 @@
+[submodule "external/py6502"]
+	path = external/py6502
+	url = https://github.com/mnaberez/py65.git

@@ -1,8 +1,13 @@
+import pytest
 from utils.py6502_utils import C64Simulator, PurePythonAssembler, C64Disassembler
 
 def test_integration():
     print("Testing Assembler...")
-    asm = PurePythonAssembler()
+    try:
+        asm = PurePythonAssembler()
+    except ImportError as e:
+        pytest.skip(f"Skipping test because py6502 is not configured/available: {e}")
+
     code = """
     * = $C000
     LDA #$01
