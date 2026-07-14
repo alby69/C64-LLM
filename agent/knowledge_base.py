@@ -40,29 +40,38 @@ class C64KnowledgeBase:
         documents = []
 
         print(f"  [{_time.time()-_t0:.1f}s] KB markdown...", flush=True)
-        for root, _, files in os.walk(self.kb_path):
-            for fname in files:
-                if not fname.endswith(".md"):
-                    continue
-                path = os.path.join(root, fname)
-                try:
-                    with open(path, "r", encoding="utf-8", errors="replace") as f:
-                        post = frontmatter.load(f)
-                    content = f"Source: {fname}\n\n" + post.content
-                    if post.metadata:
-                        tags = post.metadata.get("tags", [])
-                        if isinstance(tags, list):
-                            content += "\nTags: " + ", ".join(str(t) for t in tags)
-                        elif isinstance(tags, str):
-                            content += "\nTags: " + tags
-                    documents.append(
-                        Document(
-                            page_content=content,
-                            metadata={"source": path, **post.metadata},
+        kb_walk_paths = []
+        if self.kb_path:
+            kb_walk_paths.append(os.path.abspath(self.kb_path))
+        if os.path.exists("data/kb"):
+            abs_kb = os.path.abspath("data/kb")
+            if abs_kb not in kb_walk_paths:
+                kb_walk_paths.append(abs_kb)
+
+        for walk_path in kb_walk_paths:
+            for root, _, files in os.walk(walk_path):
+                for fname in files:
+                    if not fname.endswith(".md"):
+                        continue
+                    path = os.path.join(root, fname)
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as f:
+                            post = frontmatter.load(f)
+                        content = f"Source: {fname}\n\n" + post.content
+                        if post.metadata:
+                            tags = post.metadata.get("tags", [])
+                            if isinstance(tags, list):
+                                content += "\nTags: " + ", ".join(str(t) for t in tags)
+                            elif isinstance(tags, str):
+                                content += "\nTags: " + tags
+                        documents.append(
+                            Document(
+                                page_content=content,
+                                metadata={"source": path, **post.metadata},
+                            )
                         )
-                    )
-                except Exception as e:
-                    print(f"  Skipping {path}: {e}")
+                    except Exception as e:
+                        print(f"  Skipping {path}: {e}")
 
         print(f"  [{_time.time()-_t0:.1f}s] PDF outputs...", flush=True)
         if not os.environ.get("SKIP_PDF"):

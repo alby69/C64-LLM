@@ -14,6 +14,13 @@ rag:
   additional_knowledge_paths:
     - "core/knowledge_base"
     - "tutorial/md"
+    - "data/kb/scraped"
+
+kb_agent:
+  enabled: true
+  repo_path: "../C64-KB-Agent"
+  scraped_subpath: "data/scraped"
+  sync_on_startup: false
 
 teacher:
   # Backend: opencode | openrouter | groq | ollama | huggingface
