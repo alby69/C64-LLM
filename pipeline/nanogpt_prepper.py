@@ -136,7 +136,7 @@ class NanoGPTPrepper:
         logger.info(f"BPE tokenization complete. Total tokens: {len(ids)}. Vocab size: {vocab_size}")
         return ids, vocab_size
 
-    def prepare(self, tokenization_mode="char"):
+    def prepare(self, tokenization_mode="gpt2"):
         """
         Runs the full pipeline to generate train.bin and val.bin.
         """
@@ -236,7 +236,7 @@ To train your specialized C64 Language Model using karpathy/nanoGPT:
         print(instructions)
 
 if __name__ == "__main__":
-    mode = "char"
+    mode = "gpt2"
     if len(sys.argv) > 1:
         mode = sys.argv[1]
 

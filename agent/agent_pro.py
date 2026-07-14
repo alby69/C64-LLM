@@ -2434,6 +2434,77 @@ def launch_ui():
                 outputs=distill_log,
             )
 
+        with gr.Tab("nanoGPT"):
+            gr.Markdown("## nanoGPT — Addestra un LLM C64 da zero")
+            gr.Markdown(
+                "Addestra un modello GPT specializzato su C64 usando [nanoGPT](https://github.com/karpathy/nanoGPT). "
+                "I dati provengono dalla tua Knowledge Base e dai sorgenti raccolti."
+            )
+
+            nanogpt_status = gr.Textbox(label="Stato", value="Pronto", interactive=False)
+            nanogpt_log = gr.Textbox(label="Log", lines=12, max_lines=24, interactive=False)
+
+            with gr.Row():
+                nanogpt_prepare_btn = gr.Button("Prepara Corpus", variant="secondary")
+                nanogpt_start_btn = gr.Button("Avvia Training", variant="primary")
+                nanogpt_stop_btn = gr.Button("Stop", variant="stop")
+
+            with gr.Row():
+                nanogpt_model_size = gr.Radio(
+                    ["124M (micro)", "350M (base)"],
+                    label="Dimensione modello",
+                    value="124M (micro)",
+                )
+                nanogpt_init = gr.Radio(
+                    ["scratch", "gpt2", "gpt2-medium"],
+                    label="Inizializzazione",
+                    value="scratch",
+                )
+
+            with gr.Row():
+                nanogpt_lr = gr.Number(label="Learning rate", value=6e-4, minimum=1e-6, maximum=1e-2, step=1e-5)
+                nanogpt_max_iters = gr.Number(label="Max iterazioni", value=10000, minimum=100, maximum=100000, step=100)
+                nanogpt_batch_size = gr.Number(label="Batch size", value=12, minimum=1, maximum=128, step=1)
+                nanogpt_block_size = gr.Number(label="Block size (contesto)", value=1024, minimum=128, maximum=2048, step=128)
+
+            def on_nanogpt_prepare():
+                from pipeline.nanogpt_prepper import NanoGPTPrepper
+                prepper = NanoGPTPrepper()
+                ok = prepper.prepare(tokenization_mode="gpt2")
+                return "Pronto" if ok else "Errore"
+
+            def on_nanogpt_train(model_size, init, lr, max_iters, batch_size, block_size):
+                from pipeline.nanogpt_trainer import NanoGPTTrainer
+                size_map = {"124M (micro)": "124M", "350M (base)": "350M"}
+                trainer = NanoGPTTrainer()
+                if not trainer.ensure_repo():
+                    return "Errore: impossibile clonare nanoGPT"
+                trainer.link_data()
+                trainer.write_config(
+                    model_size=size_map.get(model_size, "124M"),
+                    init_from=init,
+                    batch_size=int(batch_size),
+                    block_size=int(block_size),
+                    lr=float(lr),
+                    max_iters=int(max_iters),
+                )
+                ok = trainer.train(capture_output=True)
+                return "Training completato" if ok else "Training fallito (vedi log)"
+
+            nanogpt_prepare_btn.click(
+                fn=on_nanogpt_prepare,
+                outputs=[nanogpt_status],
+            )
+            nanogpt_start_btn.click(
+                fn=on_nanogpt_train,
+                inputs=[nanogpt_model_size, nanogpt_init, nanogpt_lr, nanogpt_max_iters, nanogpt_batch_size, nanogpt_block_size],
+                outputs=[nanogpt_log],
+            )
+            nanogpt_stop_btn.click(
+                fn=lambda: "Fermo manuale",
+                outputs=[nanogpt_log],
+            )
+
         with gr.Tab("Grafo Wiki"):
             gr.Markdown("## Grafo della Conoscenza C64")
             gr.Markdown(

@@ -76,15 +76,27 @@ nanoGPT (karpathy/nanoGPT) come LLM locale predefinito per C64-LLM, con supporto
 - **Fine-tuning su GPT-2**: usare pesi esistenti (124M-1.5B) come base + adattamento C64
 - **Inferenza locale**: via conversione GGUF → LlamaCppBackend, o via PyTorch diretto
 
-### 2.2 Stato attuale (già implementato)
+### 2.2 Stato attuale (2026-07-14)
 
-`pipeline/nanogpt_prepper.py` (244 linee):
-- `gather_c64_corpus()` — raccoglie tutti i testi da KB, src, docs, Q&A
-- `tokenize_char()` — char-level tokenization (stile shakespeare_char)
-- `tokenize_bpe()` — BPE via tiktoken (stile GPT-2)
+`pipeline/nanogpt_prepper.py`:
+- `gather_c64_corpus()` — raccoglie tutti i testi da KB, src, docs, Q&A (~52M caratteri)
+- `tokenize_bpe()` — BPE via tiktoken GPT-2 (default, 38.6M token)
+- `tokenize_char()` — char-level (fallback, per shakespeare_char style)
 - `prepare()` — produce `train.bin` + `val.bin` + `meta.pkl`
+- Dataset generato: `data/nanogpt_c64/` (train 34.7M token, val 3.9M token)
 
-Manca: integrazione UI tab training nanoGPT, automatizzare la conversione→GGUF.
+`pipeline/nanogpt_trainer.py` (NUOVO):
+- `ensure_repo()` — clona nanoGPT in `external/` se non presente
+- `link_data()` — crea symlink dei dati in `nanoGPT/data/c64/`
+- `write_config()` — genera config YAML per 124M o 350M parametri
+- `train()` — avvia `train.py` di nanoGPT come subprocess
+
+`agent/agent_pro.py` — Tab nanoGPT aggiunto alla UI Gradio:
+- Pulsanti: Prepara Corpus, Avvia Training, Stop
+- Configurazione: model size, init, lr, max iters, batch, block size
+- Log in tempo reale
+
+TODO: conversione automatica checkpoint → GGUF per uso immediato in Chat.
 
 ### 2.3 Architettura finale proposta
 
@@ -231,15 +243,19 @@ Il `ScrapyKBAdapter` in `pipeline/acquisition/` è già il ponte. A regime, C64-
 
 ---
 
-## Roadmap
+## Roadmap (stato 2026-07-14)
 
-| Fase | Cosa | Quando |
-|------|------|--------|
-| 0 | Snellimento docus + repo (già fatto) | Ora |
-| 1 | Rimuovere script duplicati, delegare a repo fratelli | Q3 2026 |
-| 2 | `C64-Intelligence-SDK` con submodule + integrazione CI | Q3 2026 |
-| 3 | Tab UI nanoGPT + trainer pipeline | Q4 2026 |
-| 4 | Pre-train C64-Micro (124M) su corpus C64 esteso | Q4 2026 |
-| 5 | Fine-tune su GPT-2 + test comparativi | Q1 2027 |
-| 6 | Tokenizer C64 custom + pruning del vocabolario | Q1 2027 |
-| 7 | Rimpiazzo di Qwen con nanoGPT come default locale | Q2 2027 |
+| Fase | Cosa | Stato |
+|------|------|-------|
+| 0 | Snellimento documentazione (18 file -> 3) | **FATTO** |
+| 1 | Rimuovere script duplicati, delegare a repo fratelli | DA FARE |
+| 2 | `C64-Intelligence-SDK` con submodule + integrazione CI | DA FARE |
+| 3 | **nanoGPT prepper** (corpus + BPE tokenizer) | **FATTO** (`nanogpt_prepper.py`) |
+| 3 | **dataset generato** (38.6M token C64) | **FATTO** (`data/nanogpt_c64/`) |
+| 3 | **BPE GPT-2 come default** | **FATTO** |
+| 3 | **pipeline/nanogpt_trainer.py** (clone + config + training) | **FATTO** |
+| 3 | **Tab nanoGPT in UI Gradio** | **FATTO** |
+| 4 | Pre-train C64-Micro (124M) su corpus C64 esteso | DA FARE |
+| 5 | Fine-tune su GPT-2 + test comparativi | DA FARE |
+| 6 | Tokenizer C64 custom + pruning del vocabolario | DA FARE |
+| 7 | Rimpiazzo di Qwen con nanoGPT come default locale | DA FARE |
