@@ -16,12 +16,29 @@ class ScrapyKBAdapter:
     Ensures seamless ingestion of scraped web pages, tutorials, and books.
     """
 
-    def __init__(self, kb_agent_path=None, scrapy_path="../C64-Scrapy", dest_kb_path="data/kb/scraped"):
+    def __init__(self, kb_agent_path=None, scrapy_path=None, dest_kb_path="data/kb/scraped"):
+        """
+        Initializes the adapter.
+
+        Args:
+            kb_agent_path (str/Path, optional): Path to the C64-KB-Agent repository.
+                Defaults to checking local submodule 'C64-KB-Agent' first, then falling back to '../C64-KB-Agent'.
+            scrapy_path (str/Path, optional): Path to the C64-Scrapy repository.
+                Defaults to checking local submodule 'C64-Scrapy' first, then falling back to '../C64-Scrapy'.
+            dest_kb_path (str/Path, optional): Path where synced markdown files will be placed.
+        """
         if kb_agent_path is None:
             if Path("C64-KB-Agent").exists():
                 kb_agent_path = "C64-KB-Agent"
             else:
                 kb_agent_path = "../C64-KB-Agent"
+
+        if scrapy_path is None:
+            if Path("C64-Scrapy").exists():
+                scrapy_path = "C64-Scrapy"
+            else:
+                scrapy_path = "../C64-Scrapy"
+
         self.kb_agent_path = Path(kb_agent_path)
         self.scrapy_path = Path(scrapy_path)
         self.dest_kb_path = Path(dest_kb_path)

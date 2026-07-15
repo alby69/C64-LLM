@@ -60,10 +60,10 @@ A lungo termine, `data/kb/` sarà un symlink o submodule verso C64-KB-Agent.
 
 ### 1.4 Percorso di migrazione
 
-1. **Fase 1 (immediata)**: Rimuovere script duplicati, spostare responsabilità nei repo fratelli
-2. **Fase 2**: Fare `C64-Intelligence-SDK` repository aggregatore con submodule
-3. **Fase 3**: Sostituire ScrapyAdapter con submodule diretto a C64-Scrapy
-4. **Fase 4**: Sostituire logica download da Archive.org/Google Drive con chiamata a C64-Scrapy
+1. **Fase 1 (immediata)**: Rimuovere script duplicati, spostare responsabilità nei repo fratelli — **COMPLETATO** (Gli script di analisi PRG/D64/BASIC sono delegati a PYC64 e quelli di scraping a C64-Scrapy).
+2. **Fase 2**: Fare `C64-Intelligence-SDK` repository aggregatore con submodule — **COMPLETATO** (Submodulo `C64-KB-Agent` e `external/py6502` configurati e collegati).
+3. **Fase 3**: Sostituire ScrapyAdapter con submodule diretto a C64-Scrapy — **COMPLETATO** (Aggiunto `C64-Scrapy` come submodulo ufficiale del repository ed aggiornata la classe `ScrapyKBAdapter` per interfacciarsi con esso in modo prioritario rispetto a percorsi relativi esterni).
+4. **Fase 4**: Sostituire logica download da Archive.org/Google Drive con chiamata a C64-Scrapy — **COMPLETATO** (La logica obsoleta basata su `gdown`/download locali pesanti è stata interamente delegata alla suite di scraping di `C64-Scrapy` e all'ingestione tramite la scheda apposita).
 
 ---
 
@@ -259,3 +259,8 @@ Il `ScrapyKBAdapter` in `pipeline/acquisition/` è già il ponte. A regime, C64-
 | 5 | Fine-tune su GPT-2 + test comparativi | **FATTO** (Implementato script `pipeline/nanogpt_eval.py` per test comparativi e benchmark) |
 | 6 | Tokenizer C64 custom + pruning del vocabolario | **FATTO** (Aggiunta opzione `"c64_custom"` che addestra un BPE custom con HuggingFace `tokenizers`) |
 | 7 | Rimpiazzo di Qwen con nanoGPT come default locale | **FATTO** (Modificato `C64CodingAgent` e `agent_config.yaml` per usare `NanoGPTBackend` come default locale) |
+| Migrazione | **Integrazione submodulo C64-Scrapy** (Fase 3) | **FATTO** (Aggiunto submodule C64-Scrapy, aggiornato ScrapyKBAdapter per prioritizzazione percorsi locali) |
+| Migrazione | **Delega download Google Drive / Archive.org** (Fase 4) | **FATTO** (Rimossa logica di download bloated da agent_pro.py, interamente delegata agli spider mirati di C64-Scrapy) |
+| 8 | **Multi-modal RAG per sprite ed asset grafici C64** | *PROPOSTO* (Estendere il ResearcherAgent per indicizzare ed estrarre asset grafici storici/sprite da file PRG/D64 tramite PYC64 ed esporli visivamente nella chat) |
+| 9 | **Validazione sintattica ACME ed evidenziazione in tempo reale nella UI** | *PROPOSTO* (Integrare un editor Monaco o CodeMirror con linter asincrono integrato nella Chat di Gradio per feedback visivo istantaneo del codice generato) |
+| 10 | **Anteprima ed esecuzione interattiva tramite emulatore VICE WebAssembly** | *PROPOSTO* (Aggiungere un tab con emulatore VICE compilato in WASM per permettere all'utente di avviare il codice BASIC o compilato Assembly generato direttamente dal browser) |

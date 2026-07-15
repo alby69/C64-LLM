@@ -4,3 +4,6 @@
 [submodule "C64-KB-Agent"]
 	path = C64-KB-Agent
 	url = https://github.com/alby69/C64-KB-Agent.git
+[submodule "C64-Scrapy"]
+	path = C64-Scrapy
+	url = https://github.com/alby69/C64-Scrapy.git
