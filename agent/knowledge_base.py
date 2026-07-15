@@ -40,15 +40,17 @@ class C64KnowledgeBase:
 
     def build_index(self):
         import time as _time
-        # Ensure kb_path is a directory, not a file
-        if os.path.exists(self.kb_path) and not os.path.isdir(self.kb_path):
-            os.remove(self.kb_path)
+        # Ensure the real path of kb_path is a directory, not a file.
+        # This handles cases where kb_path is a symlink (broken or valid).
+        real_kb_path = os.path.realpath(self.kb_path)
+        if os.path.exists(real_kb_path) and not os.path.isdir(real_kb_path):
+            os.remove(real_kb_path)
         _t0 = _time.time()
-        if not os.path.exists(self.kb_path):
-            os.makedirs(self.kb_path, exist_ok=True)
+        if not os.path.exists(real_kb_path):
+            os.makedirs(real_kb_path, exist_ok=True)
 
-        if not os.listdir(self.kb_path):
-            with open(os.path.join(self.kb_path, "c64_memory_map.md"), "w") as f:
+        if not os.listdir(real_kb_path):
+            with open(os.path.join(real_kb_path, "c64_memory_map.md"), "w") as f:
                 f.write(
                     "# C64 Memory Map\n\n$D020: Border Color\n$D021: Background Color\n$0400-$07E7: Screen Memory\n"
                 )
