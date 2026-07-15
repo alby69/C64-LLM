@@ -29,7 +29,7 @@ class C64KnowledgeBase:
         import time as _time
         _t0 = _time.time()
         if not os.path.exists(self.kb_path):
-            os.makedirs(self.kb_path)
+            os.makedirs(self.kb_path, exist_ok=True)
 
         if not os.listdir(self.kb_path):
             with open(os.path.join(self.kb_path, "c64_memory_map.md"), "w") as f:
