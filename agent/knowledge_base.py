@@ -40,7 +40,9 @@ class C64KnowledgeBase:
 
     def build_index(self):
         import time as _time
-
+        # Ensure kb_path is a directory, not a file
+        if os.path.exists(self.kb_path) and not os.path.isdir(self.kb_path):
+            os.remove(self.kb_path)
         _t0 = _time.time()
         if not os.path.exists(self.kb_path):
             os.makedirs(self.kb_path, exist_ok=True)
