@@ -10,7 +10,16 @@ import faiss
 
 class C64KnowledgeBase:
     SKIP_EXTS = {
-        ".gz", ".gzip", ".zip", ".png", ".jpg", ".gif", ".pdf", ".d64", ".g64", ".prg",
+        ".gz",
+        ".gzip",
+        ".zip",
+        ".png",
+        ".jpg",
+        ".gif",
+        ".pdf",
+        ".d64",
+        ".g64",
+        ".prg",
     }
 
     def __init__(self, kb_path="knowledge_base", db_path="data/vectorstore"):
@@ -19,14 +28,19 @@ class C64KnowledgeBase:
         self._load_embedder()
         self.vectorstore = None
         self.docstore = []
+        self.reranker = None
+        self.rerank_k = 30
+        self.use_reranker = True
 
     def _load_embedder(self):
         from sentence_transformers import SentenceTransformer
+
         self._model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self._dim = 384
 
     def build_index(self):
         import time as _time
+
         _t0 = _time.time()
         if not os.path.exists(self.kb_path):
             os.makedirs(self.kb_path, exist_ok=True)
@@ -39,7 +53,7 @@ class C64KnowledgeBase:
 
         documents = []
 
-        print(f"  [{_time.time()-_t0:.1f}s] KB markdown...", flush=True)
+        print(f"  [{_time.time() - _t0:.1f}s] KB markdown...", flush=True)
         kb_walk_paths = []
         if self.kb_path:
             kb_walk_paths.append(os.path.realpath(self.kb_path))
@@ -73,11 +87,11 @@ class C64KnowledgeBase:
                     except Exception as e:
                         print(f"  Skipping {path}: {e}")
 
-        print(f"  [{_time.time()-_t0:.1f}s] PDF outputs...", flush=True)
+        print(f"  [{_time.time() - _t0:.1f}s] PDF outputs...", flush=True)
         if not os.environ.get("SKIP_PDF"):
             self._include_pdf_outputs(documents)
 
-        print(f"  [{_time.time()-_t0:.1f}s] docs/...", flush=True)
+        print(f"  [{_time.time() - _t0:.1f}s] docs/...", flush=True)
         if os.path.exists("docs"):
             for root, _, files in os.walk("docs"):
                 for fname in files:
@@ -99,7 +113,7 @@ class C64KnowledgeBase:
                         except Exception as e:
                             print(f"  Skipping {path}: {e}")
 
-        print(f"  [{_time.time()-_t0:.1f}s] data/input + data/src...", flush=True)
+        print(f"  [{_time.time() - _t0:.1f}s] data/input + data/src...", flush=True)
         for dirname in ["data/input", "data/src"]:
             if os.path.exists(dirname):
                 for root, _, files in os.walk(dirname):
@@ -121,20 +135,32 @@ class C64KnowledgeBase:
                         try:
                             with open(path, encoding="utf-8", errors="replace") as f:
                                 content = f.read()
-                            label = "Source Code" if ".asm" in fname else f"Source Code: {fname}"
+                            label = (
+                                "Source Code"
+                                if ".asm" in fname
+                                else f"Source Code: {fname}"
+                            )
                             content = f"{label}\n\n{content}"
                             documents.append(
-                                Document(page_content=content, metadata={"source": path})
+                                Document(
+                                    page_content=content, metadata={"source": path}
+                                )
                             )
                         except Exception as e:
                             print(f"  Skipping {fname}: {e}")
 
-        print(f"  [{_time.time()-_t0:.1f}s] {len(documents)} docs, splitting...", flush=True)
+        print(
+            f"  [{_time.time() - _t0:.1f}s] {len(documents)} docs, splitting...",
+            flush=True,
+        )
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=2000, chunk_overlap=200, separators=["\n\n", "\n", ".", " ", ""]
         )
         docs = text_splitter.split_documents(documents)
-        print(f"  [{_time.time()-_t0:.1f}s] {len(docs)} chunks, embedding...", flush=True)
+        print(
+            f"  [{_time.time() - _t0:.1f}s] {len(docs)} chunks, embedding...",
+            flush=True,
+        )
 
         texts = [d.page_content for d in docs]
         metadatas = [d.metadata for d in docs]
@@ -146,23 +172,32 @@ class C64KnowledgeBase:
             emb = self._model.encode(batch, show_progress_bar=False)
             all_embeddings.append(emb)
             elapsed = _time.time() - _t0
-            print(f"  [{elapsed:.0f}s] embed batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}", flush=True)
+            print(
+                f"  [{elapsed:.0f}s] embed batch {i // batch_size + 1}/{(len(texts) - 1) // batch_size + 1}",
+                flush=True,
+            )
 
         if len(all_embeddings) == 1:
             embeddings = all_embeddings[0]
         else:
             embeddings = np.concatenate(all_embeddings, axis=0)
 
-        print(f"  [{_time.time()-_t0:.1f}s] embeddings {embeddings.shape}, building FAISS...", flush=True)
+        print(
+            f"  [{_time.time() - _t0:.1f}s] embeddings {embeddings.shape}, building FAISS...",
+            flush=True,
+        )
         index = faiss.IndexFlatL2(self._dim)
         index.add(embeddings.astype(np.float32))
 
-        print(f"  [{_time.time()-_t0:.1f}s] saving...", flush=True)
+        print(f"  [{_time.time() - _t0:.1f}s] saving...", flush=True)
         os.makedirs(self.db_path, exist_ok=True)
         faiss.write_index(index, os.path.join(self.db_path, "index.faiss"))
         with open(os.path.join(self.db_path, "docstore.pkl"), "wb") as f:
             pickle.dump({"texts": texts, "metadatas": metadatas}, f)
-        print(f"  [{_time.time()-_t0:.1f}s] Index built with {len(docs)} chunks.", flush=True)
+        print(
+            f"  [{_time.time() - _t0:.1f}s] Index built with {len(docs)} chunks.",
+            flush=True,
+        )
 
     def load_index(self):
         faiss_path = os.path.join(self.db_path, "index.faiss")
@@ -178,18 +213,51 @@ class C64KnowledgeBase:
             self.build_index()
             self.load_index()
 
+    def _load_reranker(self):
+        try:
+            from sentence_transformers import CrossEncoder
+
+            self.reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        except ImportError:
+            print(
+                "sentence-transformers CrossEncoder not available; disabling reranker."
+            )
+            self.use_reranker = False
+
     def _include_pdf_outputs(self, documents):
         output_dir = "data/output"
         if not os.path.exists(output_dir):
             return
 
         TECH_KEYWORDS = [
-            "lda", "sta", "ldx", "stx", "jsr", "rts", "poke", "peek",
-            "$d020", "$d021", "$d000", "vic", "sid", "raster",
-            "6502", "6510", "sprite", "kernal", "cia",
-            "assembler", "codice macchina", "linguaggio macchina",
-            "opcode", "mnemonico", "accumulatore",
-            "programmer", "reference", "programmazione",
+            "lda",
+            "sta",
+            "ldx",
+            "stx",
+            "jsr",
+            "rts",
+            "poke",
+            "peek",
+            "$d020",
+            "$d021",
+            "$d000",
+            "vic",
+            "sid",
+            "raster",
+            "6502",
+            "6510",
+            "sprite",
+            "kernal",
+            "cia",
+            "assembler",
+            "codice macchina",
+            "linguaggio macchina",
+            "opcode",
+            "mnemonico",
+            "accumulatore",
+            "programmer",
+            "reference",
+            "programmazione",
         ]
 
         for fname in sorted(os.listdir(output_dir)):
@@ -203,7 +271,9 @@ class C64KnowledgeBase:
                     with open(path, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     content_lower = content.lower()
-                    keyword_count = sum(1 for kw in TECH_KEYWORDS if kw in content_lower)
+                    keyword_count = sum(
+                        1 for kw in TECH_KEYWORDS if kw in content_lower
+                    )
                     if keyword_count < 15:
                         continue
                     labeled = f"Source: {fname}\n\n{content}"
@@ -225,7 +295,9 @@ class C64KnowledgeBase:
                     with open(path, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     content_lower = content.lower()
-                    keyword_count = sum(1 for kw in TECH_KEYWORDS if kw in content_lower)
+                    keyword_count = sum(
+                        1 for kw in TECH_KEYWORDS if kw in content_lower
+                    )
                     if keyword_count < 15:
                         continue
                     labeled = f"Source: {fname}\n\n{content}"
@@ -268,6 +340,34 @@ class C64KnowledgeBase:
             src = self.docstore_meta[idx].get("source", "")
             boost = self._source_boost(src)
             scored.append((score * boost, idx))
+
+        scored.sort(key=lambda x: -x[0])
+
+        try:
+            if self.use_reranker:
+                if self.reranker is None:
+                    self._load_reranker()
+                if self.reranker is not None:
+                    rerank_n = min(self.rerank_k, len(scored))
+                    candidates = scored[:rerank_n]
+                    pairs = [(text, self.docstore[idx]) for _, idx in candidates]
+                    rerank_scores = self.reranker.predict(pairs)
+                    reranked = sorted(
+                        zip(rerank_scores, [idx for _, idx in candidates]),
+                        key=lambda x: -x[0],
+                    )
+                    scored = [
+                        (
+                            rs
+                            * self._source_boost(
+                                self.docstore_meta[idx].get("source", "")
+                            ),
+                            idx,
+                        )
+                        for rs, idx in reranked
+                    ]
+        except Exception as e:
+            print(f"Reranker failed, falling back to FAISS scoring: {e}")
 
         scored.sort(key=lambda x: -x[0])
         results = []

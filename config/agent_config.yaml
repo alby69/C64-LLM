@@ -26,6 +26,10 @@ rag:
     - "core/knowledge_base"
     - "tutorial/md"
     - "data/kb/scraped"
+  reranker:
+    enabled: true
+    model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    k_rerank: 30
 
 kb_agent:
   enabled: true
