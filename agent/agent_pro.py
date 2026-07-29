@@ -20,6 +20,13 @@ import gradio as gr
 from agent.model_backend import ModelBackend, LlamaCppBackend
 from agent.knowledge_base import C64KnowledgeBase
 
+# Importazione nuovi componenti UI e Utility
+from ui.components.code_editor import RetroCodeEditor
+from ui.components.vice_emulator import VICEEmulator
+from ui.components.memory_map import InteractiveMemoryMap
+from ui.components.asset_gallery import AssetGallery
+from utils.prg_builder import PRGBuilder
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 PREDEFINED = [
@@ -1812,7 +1819,8 @@ def bootstrap():
         "knowledge_base",
     ]
     for d in dirs:
-        os.makedirs(d, exist_ok=True)
+        if not os.path.exists(d) and not os.path.islink(d):
+            os.makedirs(d, exist_ok=True)
     print(f"Bootstrap completato: {len(dirs)} cartelle verificate/create.")
 
 
@@ -2419,6 +2427,155 @@ def launch_ui():
             wiki_reset.click(
                 fn=lambda: render_wiki_graph_svg(None),
                 outputs=wiki_graph_html,
+            )
+
+        # === NUOVI TAB AGGIUNTI (FASI 8, 9, 10) ===
+        editor_comp = RetroCodeEditor()
+        emu_comp = VICEEmulator()
+        mem_comp = InteractiveMemoryMap()
+        gallery_comp = AssetGallery()
+        builder = PRGBuilder()
+
+        with gr.Tab("Retro Editor & Linter"):
+            gr.Markdown("## 📝 Retro Editor di Codice C64 con Monaco & Linter")
+            gr.Markdown("Scrivi codice Assembly ACME o BASIC v2. Il linter asincrono rileverà errori o avvisi in tempo reale.")
+
+            with gr.Row():
+                with gr.Column(scale=3):
+                    # Monaco editor wrapper HTML
+                    editor_html = gr.HTML(editor_comp.render_monaco_html("; Scrivi il tuo codice qui\\n* = $C000\\n\\nstart:\\n        lda #$01\\n        sta $d020\\n        rts"))
+                    # Textarea per sincronizzazione (visibile per massimizzare la compatibilità del DOM e usabilità)
+                    editor_sync_box = gr.Textbox(visible=True, label="Sorgente Editor (Sincronizzato)", elem_classes="c64-sync-target", lines=12)
+
+                    with gr.Row():
+                        lint_btn = gr.Button("🔍 Esegui Linter", variant="secondary")
+                        autofix_btn = gr.Button("🔧 Auto-Fix (Self-Healing)", variant="primary")
+                        compile_btn = gr.Button("⚡ Compila ed Esegui", variant="stop")
+
+                with gr.Column(scale=1):
+                    gr.Markdown("### Log del Linter")
+                    linter_output = gr.Textbox(label="Risultato Analisi", lines=10, value="In attesa di analisi...")
+
+                    gr.Markdown("### Stato Compilazione")
+                    compiler_output = gr.Textbox(label="Stato Esecuzione", lines=5, value="Pronto.")
+
+            # Handlers del linter e compilatore
+            lint_btn.click(
+                fn=editor_comp.lint_code,
+                inputs=[editor_sync_box],
+                outputs=[linter_output]
+            )
+
+            def handle_auto_fix(code, linter_logs):
+                global agent
+                if not linter_logs or "Nessun errore" in linter_logs:
+                    return code, "Nessuna correzione necessaria."
+
+                # Chiama l'agente coder per correggere il codice usando l'orchestratore o prompt diretto
+                prompt = f"Correggi questo codice Assembly/BASIC C64 correggendo i seguenti errori trovati dal linter:\\n\\n{linter_logs}\\n\\nCODICE SORGENTE:\\n```\\n{code}\\n```"
+                try:
+                    fixed_code = agent.backend.generate(prompt, max_new_tokens=400, temperature=0.2)
+                    # Estrai il blocco di codice generato
+                    blocks = re.findall(r"```(?:assembly|asm|6502|basic)?\n(.*?)\n```", fixed_code, re.DOTALL | re.IGNORECASE)
+                    if blocks:
+                        return blocks[0], "Codice corretto autonomamente tramite Self-Healing!"
+                    return fixed_code, "Codice rigenerato."
+                except Exception as e:
+                    return code, f"Errore durante l'auto-fix: {e}"
+
+            autofix_btn.click(
+                fn=handle_auto_fix,
+                inputs=[editor_sync_box, linter_output],
+                outputs=[editor_sync_box, linter_output]
+            )
+
+        with gr.Tab("Emulatore VICE WASM"):
+            gr.Markdown("## 🎮 Emulatore VICE Commodore 64 Integrato")
+            gr.Markdown("Esegui direttamente nel browser il codice compilato o esportato.")
+
+            emu_screen_html = gr.HTML(emu_comp.render_emulator_html())
+
+            def handle_compilation(code):
+                global agent
+                is_basic = re.match(r"^\\s*\\d+\\s", code.strip()) is not None
+                if is_basic:
+                    prg_bytes, msg = builder.build_basic_prg(code)
+                else:
+                    prg_bytes, msg = builder.build_assembly_prg(code)
+
+                if prg_bytes:
+                    # Rigenera la schermata dell'emulatore con i byte caricati
+                    name = "program.prg"
+                    emu_html = emu_comp.render_emulator_html(prg_bytes, file_name=name)
+                    return emu_html, f"✅ Compilazione riuscita!\\n{msg}"
+                else:
+                    return emu_comp.render_emulator_html(), f"❌ Errore compilazione:\\n{msg}"
+
+            compile_btn.click(
+                fn=handle_compilation,
+                inputs=[editor_sync_box],
+                outputs=[emu_screen_html, compiler_output]
+            )
+
+        with gr.Tab("Galleria Asset Visivi"):
+            gr.Markdown("## 🎨 Galleria Asset Visivi C64 (Fase 8)")
+            gr.Markdown("Esplora e ricerca sprite storici o character set estratti da file PRG/D64 tramite PYC64.")
+
+            with gr.Row():
+                with gr.Column(scale=2):
+                    gallery_search = gr.Textbox(label="Cerca negli Asset", placeholder="Inserisci termini come 'balloon', 'alien', 'sprite'...")
+                    gallery_html = gr.HTML(gallery_comp.render_gallery_html())
+
+                with gr.Column(scale=1):
+                    gr.Markdown("### Azioni Asset")
+                    selected_asset_id = gr.Textbox(label="ID Asset Selezionato", value="sprite_balloon", elem_classes="c64-selected-asset")
+                    export_format = gr.Radio(["BASIC", "Assembly"], label="Formato Esportazione", value="BASIC")
+                    export_code_btn = gr.Button("📋 Esporta Codice all'Editor", variant="primary")
+
+            gallery_search.submit(
+                fn=gallery_comp.render_gallery_html,
+                inputs=[gallery_search],
+                outputs=[gallery_html]
+            )
+
+            def handle_export(asset_id, fmt):
+                global agent
+                code = gallery_comp.generate_c64_code(asset_id, fmt)
+                return code, f"Codice esportato con successo in formato {fmt}!"
+
+            export_code_btn.click(
+                fn=handle_export,
+                inputs=[selected_asset_id, export_format],
+                outputs=[editor_sync_box, compiler_output]
+            )
+
+        with gr.Tab("Mappa Memoria Interattiva"):
+            gr.Markdown("## 🗺️ Mappa di Memoria C64 Interattiva ($0000-$FFFF)")
+            gr.Markdown("Visualizza graficamente l'allocazione della RAM e ROM del C64 e consiglia indirizzi di caricamento.")
+
+            mem_map_html = gr.HTML(mem_comp.render_html_map())
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### Verifica Sicurezza Indirizzo")
+                    check_addr = gr.Number(label="Indirizzo Iniziale (Decimale o Hex)", value=49152)
+                    check_size = gr.Number(label="Dimensione (Byte)", value=256)
+                    check_btn = gr.Button("🛡️ Verifica Range", variant="primary")
+                with gr.Column(scale=1):
+                    check_result = gr.Textbox(label="Risultato Controllo", lines=5, value="Inserisci un indirizzo per verificare la sicurezza.")
+
+            def handle_safety_check(addr, size):
+                try:
+                    val = int(addr)
+                    ok, msg = mem_comp.check_safety(val, int(size))
+                    return msg
+                except Exception as e:
+                    return f"Errore formato indirizzo: {e}"
+
+            check_btn.click(
+                fn=handle_safety_check,
+                inputs=[check_addr, check_size],
+                outputs=[check_result]
             )
 
     demo.launch(server_name="0.0.0.0", theme=gr.themes.Soft())

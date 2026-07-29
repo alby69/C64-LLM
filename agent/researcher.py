@@ -2,9 +2,12 @@ from agent.knowledge_base import C64KnowledgeBase
 from utils.prompt_manager import PromptManager
 from agent.model_backend import ModelBackend
 
+from agent.multimodal_rag import MultimodalRAG
+
 class ResearcherAgent:
     def __init__(self, model=None, tokenizer=None):
         self.kb = C64KnowledgeBase()
+        self.multimodal_rag = MultimodalRAG()
         if model is not None and hasattr(model, 'generate'):
             self.backend = model
         elif model is not None:
@@ -92,6 +95,21 @@ class ResearcherAgent:
         for i, doc in enumerate(docs[:max_chunks]):
             source = doc.metadata.get('source', 'Unknown')
             context += f"--- Frammento {i+1} (Sorgente: {source}) ---\n{doc.page_content}\n"
+
+        # 5. Integrazione Multi-modale: ricerca asset grafici se rilevanti
+        graphic_keywords = ["sprite", "balloon", "alien", "charset", "grafic", "bitmap", "disegno", "colore"]
+        if any(kw in query.lower() for kw in graphic_keywords):
+            matched_assets = self.multimodal_rag.search_assets(query)
+            if matched_assets:
+                context += "\n--- Asset Grafici Correlati (Multi-modal RAG) ---\n"
+                for asset in matched_assets[:3]:
+                    context += (
+                        f"ID: {asset['id']}\n"
+                        f"Nome: {asset['name']}\n"
+                        f"Tipo: {asset['type']} ({asset['mode']}, {asset['dimensions']})\n"
+                        f"Descrizione: {asset['description']}\n"
+                        f"File di Preview: {asset['filepath']}\n\n"
+                    )
 
         print(f"[Researcher] Context built from {min(len(docs), max_chunks)} chunks ({len(context)} chars)")
         return context
