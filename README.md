@@ -69,6 +69,10 @@ python -m agent.agent_pro
 5. **Distillazione e LoRA**: Genera dataset sintetici Q&A (factual, theory, codegen, explain, bugfix) usando 5 possibili backend Teacher (Groq, OpenRouter, OpenCode, ecc.) ed esegue il LoRA training locale.
 6. **nanoGPT**: Gestisce interamente la pipeline nanoGPT. Permette di preparare il corpus, scegliere la tokenizzazione, impostare i parametri del modello (124M/350M), avviare/fermare in modo asincrono l'addestramento visualizzando la loss in streaming e convertire i checkpoint in GGUF.
 7. **Dati**: Esploratore tabellare del dataset generato o distillato.
+8. **Retro Editor & Linter**: Editor di codice Monaco C64 retro-styled con evidenziazione sintattica avanzata e linter statico in tempo reale. Offre auto-fix autonomo di errori sintattici tramite agenti (Self-Healing).
+9. **Emulatore VICE**: Emulatore grafico C64 HTML5/Canvas integrato con pannello interattivo per la visualizzazione dello stato dei registri CPU 6510 e download del file `.prg` compilato.
+10. **Galleria Asset Visivi**: Visualizzazione e ricerca degli sprite, charset e bitmap decodificati. Consente l'esportazione automatica di codice pronto da eseguire nel C64.
+11. **Mappa Memoria**: Rappresentazione grafica interattiva della memoria del C64 con hover informativo, raccomandazioni per codice macchina e controllo di sicurezza anti-collisione per i range di indirizzi.
 * **Wiki Graph (Mappa Concettuale)**: Grafo concettuale C64 interattivo in SVG integrato nella UI con 87 nodi e 105 archi, con zoom, pan e filtri.
 
 ---
