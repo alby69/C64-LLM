@@ -1,0 +1,14 @@
+name: ai-agent
+display_name: "C64-LLM — AI agents & RAG"
+version: "0.1.0"
+sdk_api_version: "1"
+description: "Sistema multi-agente LLM (Researcher/Coder/Validator/Orchestrator), pipeline RAG e knowledge distillation per C64."
+entry_points:
+  pipeline: "run_pipeline.py:main"
+capabilities:
+  - ai-agents
+  - rag
+  - knowledge-distillation
+  - code-generation
+requires_python: ">=3.10"
+standalone: true
