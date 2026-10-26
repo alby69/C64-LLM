@@ -11,6 +11,8 @@ import numpy as np
 logger = logging.getLogger("nanoGPT_Prepper")
 logging.basicConfig(level=logging.INFO)
 
+from config.settings import settings
+
 class NanoGPTPrepper:
     """
     Prepares and pre-tokenizes the Commodore 64 Knowledge Base
@@ -18,10 +20,24 @@ class NanoGPTPrepper:
     Supports both BPE (GPT-2 tiktoken) and Character-level tokenization.
     """
 
-    def __init__(self, output_dir="data/nanogpt_c64", val_ratio=0.1):
-        self.output_dir = Path(output_dir)
+    def __init__(self, output_dir=None, val_ratio=0.1):
+        self.output_dir = Path(output_dir or settings.NANOGPT_DATA_DIR)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.val_ratio = val_ratio
+
+    def _read_files(self, paths, extensions, prefix, corpus_parts):
+        ext_list = [extensions] if isinstance(extensions, str) else extensions
+        for p in paths:
+            if p.exists():
+                logger.info(f"Scanning files in: {p}")
+                for file_path in p.glob("**/*"):
+                    if file_path.is_file() and (not ext_list or file_path.suffix.lower() in ext_list):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                                text = f.read()
+                            corpus_parts.append(f"\n\n--- {prefix}: {file_path.name} ---\n\n{text}\n<|endoftext|>\n")
+                        except Exception as e:
+                            logger.error(f"Error reading {file_path}: {e}")
 
     def gather_c64_corpus(self):
         """
@@ -31,39 +47,27 @@ class NanoGPTPrepper:
         logger.info("Gathering text corpus from C64 Knowledge Base sources...")
         corpus_parts = []
 
-        # 1. Scan markdown files in knowledge_base/, data/kb/, and C64-KB-Agent submodule
-        kb_paths = [
-            Path("knowledge_base"),
-            Path("data/kb"),
-            Path("docs"),
-            Path("C64-KB-Agent/data/docs"),
-            Path("C64-KB-Agent/knowledge_base")
+        scan_configs = [
+            {
+                "paths": [
+                    Path("knowledge_base"),
+                    Path("data/kb"),
+                    Path("docs"),
+                    Path("C64-KB-Agent/data/docs"),
+                    Path("C64-KB-Agent/knowledge_base")
+                ],
+                "ext": ".md",
+                "prefix": "DOCUMENT"
+            },
+            {
+                "paths": [Path("data/src"), Path("data/input")],
+                "ext": [".asm", ".bas", ".txt"],
+                "prefix": "SOURCE"
+            }
         ]
-        for kb_path in kb_paths:
-            if kb_path.exists():
-                logger.info(f"Scanning markdown files in: {kb_path}")
-                for md_file in kb_path.glob("**/*.md"):
-                    try:
-                        with open(md_file, 'r', encoding='utf-8', errors='replace') as f:
-                            text = f.read()
-                        # Add document boundary marker (standard GPT-2 endoftext token representation)
-                        corpus_parts.append(f"\n\n--- DOCUMENT: {md_file.name} ---\n\n{text}\n<|endoftext|>\n")
-                    except Exception as e:
-                        logger.error(f"Error reading {md_file}: {e}")
 
-        # 2. Scan source code files (.asm, .bas, .txt) in data/src/ and data/input/
-        code_paths = [Path("data/src"), Path("data/input")]
-        for code_path in code_paths:
-            if code_path.exists():
-                logger.info(f"Scanning code files in: {code_path}")
-                for code_file in code_path.glob("**/*"):
-                    if code_file.suffix.lower() in [".asm", ".bas", ".txt"]:
-                        try:
-                            with open(code_file, 'r', encoding='utf-8', errors='replace') as f:
-                                text = f.read()
-                            corpus_parts.append(f"\n\n--- SOURCE: {code_file.name} ---\n\n{text}\n<|endoftext|>\n")
-                        except Exception as e:
-                            logger.error(f"Error reading {code_file}: {e}")
+        for cfg in scan_configs:
+            self._read_files(cfg["paths"], cfg["ext"], cfg["prefix"], corpus_parts)
 
         # 3. Incorporate generated QA distillation dataset (if present)
         distill_file = Path("data/output/distill_dataset.jsonl")
