@@ -1,19 +1,15 @@
 import re
 
+from config.settings import settings
+
 class MemoryAdvisor:
     """Utility specializzata nella gestione e consulenza della memoria C64."""
 
-    SYSTEM_VECTORS = {
-        0x0314: "CINV (IRQ Vector)",
-        0x0316: "CBINV (BRK Vector)",
-        0x0318: "NMINV (NMI Vector)",
-        0xFFFA: "NMI Vector (Hardware)",
-        0xFFFC: "RESET Vector",
-        0xFFFE: "IRQ/BRK Vector (Hardware)"
-    }
-
     def __init__(self):
         self.allocations = [] # List of {start, end, purpose}
+        self.system_vectors = {
+            start: name for start, end, name in settings.C64_SYSTEM_VECTORS
+        }
 
     def add_allocation(self, start, end, purpose):
         collision = self.check_collision(start, end)
@@ -32,7 +28,7 @@ class MemoryAdvisor:
                 return f"${alloc['start']:04X}-${alloc['end']:04X} ({alloc['purpose']})"
 
         # Controlla collisioni con vettori di sistema
-        for addr, name in self.SYSTEM_VECTORS.items():
+        for addr, name in self.system_vectors.items():
             if start <= addr <= end:
                 return f"${addr:04X} ({name})"
 

@@ -1,4 +1,5 @@
 import os
+from abc import ABC, abstractmethod
 import torch
 
 try:
@@ -7,13 +8,30 @@ except ImportError:
     Llama = None
 
 
-class ModelBackend:
+class BaseModelBackend(ABC):
+    @abstractmethod
+    def generate(self, prompt: str, max_new_tokens: int = 512, temperature: float = 0.3, top_p: float = 0.9) -> str:
+        """Genera una risposta testuale dal prompt fornito."""
+        pass
+
+    @property
+    @abstractmethod
+    def supports_lora(self) -> bool:
+        """Ritorna True se il backend supporta il caricamento dinamico di LoRA."""
+        pass
+
+
+class ModelBackend(BaseModelBackend):
     def __init__(self, model, tokenizer, base_model=None):
         self.model = model
         self.tokenizer = tokenizer
         self.device = model.device if hasattr(model, "device") else "cpu"
         self._base_model = base_model or model
         self._lora_path = None
+
+    @property
+    def supports_lora(self) -> bool:
+        return True
 
     def load_lora(self, lora_path):
         from peft import PeftModel
@@ -57,7 +75,7 @@ class ModelBackend:
         )
 
 
-class LlamaCppBackend:
+class LlamaCppBackend(BaseModelBackend):
     """Integrazione llama.cpp per GGUF su CPU."""
 
     def __init__(self, model_path):
@@ -76,12 +94,15 @@ class LlamaCppBackend:
             )
             self.llm = None
 
-    def load_lora(self, lora_path):
-        print("GGUF backend non supporta LoRA dinamico.")
+    @property
+    def supports_lora(self) -> bool:
         return False
 
+    def load_lora(self, lora_path):
+        raise NotImplementedError("LlamaCppBackend non supporta LoRA dinamico.")
+
     def unload_lora(self):
-        return True
+        raise NotImplementedError("LlamaCppBackend non supporta LoRA dinamico.")
 
     def generate(self, prompt, max_new_tokens=512, temperature=0.3, top_p=0.9):
         if self.llm:
@@ -97,7 +118,7 @@ class LlamaCppBackend:
         return "ERROR: Llama-cpp backend not properly initialized. This is a mock response."
 
 
-class NanoGPTBackend:
+class NanoGPTBackend(BaseModelBackend):
     """Integrazione per l'inferenza di modelli addestrati o fine-tunati con nanoGPT."""
 
     def __init__(self, model_path, tokenizer_name="gpt2"):
@@ -148,12 +169,15 @@ class NanoGPTBackend:
         else:
             print(f"Percorso modello nanoGPT non valido o assente: {model_path}. Uso in modalita di fallback.")
 
-    def load_lora(self, lora_path):
-        print("Il backend nanoGPT non supporta LoRA dinamico.")
+    @property
+    def supports_lora(self) -> bool:
         return False
 
+    def load_lora(self, lora_path):
+        raise NotImplementedError("NanoGPTBackend non supporta LoRA dinamico.")
+
     def unload_lora(self):
-        return True
+        raise NotImplementedError("NanoGPTBackend non supporta LoRA dinamico.")
 
     def generate(self, prompt, max_new_tokens=512, temperature=0.3, top_p=0.9):
         if self.model and self.tokenizer:
